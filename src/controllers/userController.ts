@@ -60,6 +60,9 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
         bio: true,
         wealthLevel: true,
         charmLevel: true,
+         activeCall: true,   // 👈 ajouté
+        isVerified: true,   // 👈 ajouté (tu en auras besoin pour le badge vérifié)
+       
       }
     });
 
