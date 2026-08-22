@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum CallType {
+  AUDIO
+  VIDEO
+}
+
+enum TabCategory {
+  RECOMMENDED
+  NEW
+  FEATURED
+}
+
+model User {
+  id           String      @id @default(uuid())
+  phone        String?     @unique
+  email        String?     @unique
+  password     String
+  nickname     String
+  avatar       String?
+  gender       Gender      @default(MALE)
+  bio          String?
+  
+  coins        Int         @default(0)
+  diamonds     Int         @default(0)
+  
+  wealthLevel  Int         @default(1)
+  charmLevel   Int         @default(1)
+  isVip        Boolean     @default(false)
+  
+  isOnline     Boolean     @default(false)
+  lastSeen     DateTime    @default(now())
+
+  // Nouveaux champs pour correspondre à l'accueil
+  distance     String?     @default("1.0 km")
+  isVerified   Boolean     @default(false)
+  activeCall   CallType?   // AUDIO, VIDEO ou null
+  tabCategory  TabCategory @default(RECOMMENDED)
+
+  // Relations
+  sentInteractions     UserInteraction[] @relation("SentInteractions")
+  receivedInteractions UserInteraction[] @relation("ReceivedInteractions")
+  
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@map("users")
+}
+
+// Table pour gérer les likes / clics sur le bouton "HI" depuis l'accueil
+model UserInteraction {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  status     String   @default("liked") // 'liked', 'matched', etc.
+  
+  sender     User     @relation("SentInteractions", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("ReceivedInteractions", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+
+  @@unique([senderId, receiverId]) // Empêche de doubler les likes entre les mêmes personnes
+  @@map("user_interactions")
+}
+
+// Table pour les messages du futur onglet Chat
+model Message {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  content    String
+  isRead     Boolean  @default(false)
+
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+
+  @@map("messages")
+}
