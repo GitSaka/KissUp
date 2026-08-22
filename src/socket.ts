@@ -1,5 +1,6 @@
 import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
+import { prisma } from './config/prisma.js'; // 👈 adapte le chemin selon ton arborescence
 
 // Table de hachage en mémoire : Associe un userId Prisma à son identifiant de socket en direct
 const connectedUsers = new Map<string, string>();
@@ -75,6 +76,32 @@ export function initSocketServer(server: HttpServer) {
           console.log(`❌ Utilisateur hors-ligne : ${userId}`);
           break;
         }
+      }
+    });
+
+        // 💬 6. CHAT PRIVÉ 1-À-1 (persistant en base de données)
+    socket.on('send_private_message', async (data: { senderId: string; receiverId: string; content: string }) => {
+      try {
+        // On sauvegarde le message en base via Prisma (import prisma en haut du fichier)
+        const savedMessage = await prisma.message.create({
+          data: {
+            senderId: data.senderId,
+            receiverId: data.receiverId,
+            content: data.content,
+          },
+        });
+
+        // On envoie le message en direct au destinataire s'il est connecté
+        const targetSocketId = connectedUsers.get(data.receiverId);
+        if (targetSocketId) {
+          io.to(targetSocketId).emit('receive_private_message', savedMessage);
+        }
+
+        // On confirme aussi à l'expéditeur que le message est bien parti (pour mettre à jour son écran)
+        socket.emit('message_sent_confirmation', savedMessage);
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde du message privé:', error);
+        socket.emit('message_error', { message: "Erreur lors de l'envoi du message." });
       }
     });
   });
