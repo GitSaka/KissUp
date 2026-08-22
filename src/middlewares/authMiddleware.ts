@@ -23,7 +23,7 @@ export const verifyJwt = (req: AuthenticatedRequest, res: Response, next: NextFu
     const token = authHeader.split(' ')[1];
 
     // 3. Vérifier et décoder le token avec ta clé secrète JWT
-    const secret = process.env.JWT_SECRET || 'ta_cle_secrete_par_defaut';
+   const secret = process.env.JWT_SECRET || 'secret';
     
     const decoded = jwt.verify(token, secret) as { userId: string };
 

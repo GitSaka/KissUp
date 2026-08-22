@@ -27,6 +27,10 @@ export const getHomeUsers = async (req: AuthenticatedRequest, res: Response): Pr
         distance: true,
         isOnline: true,
         bio: true,
+         activeCall: true,   // 👈 ajouté
+        isVerified: true,   // 👈 ajouté (tu en auras besoin pour le badge vérifié)
+        charmLevel: true,   // 👈 ajouté (pour le levelKey/badge niveau)
+        wealthLevel: true,
       }
     });
 
