@@ -32,6 +32,7 @@ model User {
   password     String
   nickname     String
   avatar       String?
+  
   gender       Gender      @default(MALE)
   bio          String?
   

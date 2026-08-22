@@ -1,0 +1,220 @@
+import { PrismaClient, Gender, CallType, TabCategory } from '@prisma/client';
+import process from 'process'; // 
+
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log('🌱 Début du peuplement de la base de données (Seed)...');
+
+  // 1. On supprime d'abord les tables dépendantes pour éviter les erreurs de clés étrangères
+  await prisma.userInteraction.deleteMany({});
+  await prisma.message.deleteMany({});
+  await prisma.user.deleteMany({});
+
+  const mockProfiles = [
+    {
+      nickname: 'Amina',
+      email: 'amina@sugo.com',
+      password: 'hashed_password_123',
+      gender: Gender.FEMALE,
+      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330',
+      distance: '1.2 km',
+      isVerified: true,
+      activeCall: CallType.AUDIO,
+      tabCategory: TabCategory.RECOMMENDED,
+      isOnline: true,
+      bio: 'Passionnée de voyage et de musique live 🎶',
+      coins: 100,
+      diamonds: 50,
+      wealthLevel: 2,
+      charmLevel: 18,
+    },
+    {
+      nickname: 'Lucas',
+      email: 'lucas@sugo.com',
+      password: 'hashed_password_123',
+      gender: Gender.MALE,
+      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e',
+      distance: '4.5 km',
+      isVerified: false,
+      activeCall: CallType.VIDEO,
+      tabCategory: TabCategory.RECOMMENDED,
+      isOnline: true,
+      bio: 'Développeur et grand fan de chill 💻☕',
+      coins: 50,
+      diamonds: 10,
+      wealthLevel: 1,
+      charmLevel: 24,
+    },
+    {
+      nickname: 'Fatou',
+      email: 'fatou@sugo.com',
+      password: 'hashed_password_123',
+      gender: Gender.FEMALE,
+      avatar: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04',
+      distance: '2.1 km',
+      isVerified: true,
+      activeCall: CallType.AUDIO,
+      tabCategory: TabCategory.RECOMMENDED,
+      isOnline: true,
+      bio: 'Mode et lifestyle ✨',
+      coins: 200,
+      diamonds: 120,
+      wealthLevel: 3,
+      charmLevel: 30,
+    },
+    {
+      nickname: 'Kévin',
+      email: 'kevin@sugo.com',
+      password: 'hashed_password_123',
+      gender: Gender.MALE,
+      avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6',
+      distance: '5.0 km',
+      isVerified: false,
+      activeCall: null,
+      tabCategory: TabCategory.RECOMMENDED,
+      isOnline: false,
+      bio: 'Entrepreneur & Sportif 🏀',
+      coins: 10,
+      diamonds: 0,
+      wealthLevel: 1,
+      charmLevel: 12,
+    },
+    {
+      nickname: 'Marie',
+      email: 'marie@sugo.com',
+      password: 'hashed_password_123',
+      gender: Gender.FEMALE,
+      avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1',
+      distance: '0.5 km',
+      isVerified: true,
+      activeCall: CallType.VIDEO,
+      tabCategory: TabCategory.RECOMMENDED,
+      isOnline: true,
+      bio: 'Étudiante en art et passionnée de cuisine 🎨',
+      coins: 500,
+      diamonds: 300,
+      wealthLevel: 4,
+      charmLevel: 40,
+    },
+    {
+      nickname: 'Chantal',
+      email: 'chantal@sugo.com',
+      password: 'hashed_password_123',
+      gender: Gender.FEMALE,
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb',
+      distance: '0.8 km',
+      isVerified: true,
+      activeCall: null,
+      tabCategory: TabCategory.NEW,
+      isOnline: true,
+      bio: "Nouvelle sur l'application, venez dire coucou 👋",
+      coins: 30,
+      diamonds: 5,
+      wealthLevel: 1,
+      charmLevel: 5,
+    },
+    {
+      nickname: 'Serge',
+      email: 'serge@sugo.com',
+      password: 'hashed_password_123',
+      gender: Gender.MALE,
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d',
+      distance: '3.3 km',
+      isVerified: false,
+      activeCall: CallType.AUDIO,
+      tabCategory: TabCategory.NEW,
+      isOnline: true,
+      bio: 'Juste ici pour faire de nouvelles rencontres.',
+      coins: 20,
+      diamonds: 2,
+      wealthLevel: 1,
+      charmLevel: 3,
+    },
+    {
+      nickname: 'Awa',
+      email: 'awa@sugo.com',
+      password: 'hashed_password_123',
+      gender: Gender.FEMALE,
+      avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9',
+      distance: '1.5 km',
+      isVerified: false,
+      activeCall: null,
+      tabCategory: TabCategory.NEW,
+      isOnline: true,
+      bio: 'Coucou tout le monde !',
+      coins: 15,
+      diamonds: 1,
+      wealthLevel: 1,
+      charmLevel: 2,
+    },
+    {
+      nickname: 'Jessica VIP',
+      email: 'jessica@sugo.com',
+      password: 'hashed_password_123',
+      gender: Gender.FEMALE,
+      avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9',
+      distance: '10.0 km',
+      isVerified: true,
+      activeCall: CallType.VIDEO,
+      tabCategory: TabCategory.FEATURED,
+      isOnline: true,
+      bio: 'Top Streamer de la semaine 🌟 Venez dans mon salon vocal !',
+      coins: 5000,
+      diamonds: 2500,
+      wealthLevel: 5,
+      charmLevel: 99,
+    },
+    {
+      nickname: 'Marc Star',
+      email: 'marc@sugo.com',
+      password: 'hashed_password_123',
+      gender: Gender.MALE,
+      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e',
+      distance: '8.2 km',
+      isVerified: true,
+      activeCall: CallType.AUDIO,
+      tabCategory: TabCategory.FEATURED,
+      isOnline: true,
+      bio: 'Chanteur pro, animateur de salon officiel.',
+      coins: 3000,
+      diamonds: 1500,
+      wealthLevel: 4,
+      charmLevel: 85,
+    },
+    {
+      nickname: 'Sandra Queen',
+      email: 'sandra@sugo.com',
+      password: 'hashed_password_123',
+      gender: Gender.FEMALE,
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb',
+      distance: '6.4 km',
+      isVerified: true,
+      activeCall: CallType.VIDEO,
+      tabCategory: TabCategory.FEATURED,
+      isOnline: false,
+      bio: 'Reine des cadeaux de la semaine 👑',
+      coins: 2500,
+      diamonds: 1200,
+      wealthLevel: 4,
+      charmLevel: 75,
+    },
+  ];
+
+  for (const profile of mockProfiles) {
+    await prisma.user.create({
+      data: profile,
+    });
+  }
+
+  console.log('✨ Seed terminé avec succès ! 11 profils insérés dans PostgreSQL.');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Erreur lors du seed :', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

@@ -3,8 +3,10 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import zegoRoutes from './routes/index.js'; // 👈 1. Importe tes routes zego
+import userRoutes from './routes/userRoutes.js';
 import { prisma } from './config/prisma.js';
 import { createServer } from 'http';
+
 
 dotenv.config();
 
@@ -19,6 +21,7 @@ app.use(express.json());
 // Routes API
 app.use('/api/auth', authRoutes);
 app.use('/api/zego', zegoRoutes); // 👈 2. Branche la route ici (accessible via /api/zego/token)
+app.use('/api/users', userRoutes); // 👈 ajoute cette ligne
 
 // Route de test
 app.get('/health', (req, res) => {
