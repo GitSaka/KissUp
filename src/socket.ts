@@ -1,14 +1,13 @@
 import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
-import { prisma } from './config/prisma.js'; // 👈 adapte le chemin selon ton arborescence
+import { prisma } from './config/prisma.js';
 
-// Table de hachage en mémoire : Associe un userId Prisma à son identifiant de socket en direct
 const connectedUsers = new Map<string, string>();
 
 export function initSocketServer(server: HttpServer) {
   const io = new Server(server, {
     cors: {
-      origin: "*", // Autorise les connexions depuis n'importe quel appareil mobile
+      origin: "*",
       methods: ["GET", "POST"]
     }
   });
@@ -16,7 +15,6 @@ export function initSocketServer(server: HttpServer) {
   io.on('connection', (socket: Socket) => {
     console.log(`🔌 Nouveau téléphone connecté au réseau : ${socket.id}`);
 
-    // 👤 1. ENREGISTREMENT : Le smartphone signale qui il est dès qu'il s'allume
     socket.on('register_user', (userId: string) => {
       if (userId) {
         connectedUsers.set(userId, socket.id);
@@ -24,10 +22,8 @@ export function initSocketServer(server: HttpServer) {
       }
     });
 
-    // 📞 2. DÉCLENCHEMENT DE L'APPEL : Saka demande à appeler Élodie
     socket.on('initiate_call', (data: { callerId: string; callerName: string; receiverId: string; callID: string }) => {
       const targetSocketId = connectedUsers.get(data.receiverId);
-
       if (targetSocketId) {
         io.to(targetSocketId).emit('incoming_call_request', {
           callerId: data.callerId,
@@ -40,7 +36,6 @@ export function initSocketServer(server: HttpServer) {
       }
     });
 
-    // ❌ 3. ANNULATION / REJET : Élodie refuse l'appel ou Saka raccroche avant qu'elle ne décroche
     socket.on('reject_call', (data: { receiverId: string; callerId: string }) => {
       const callerSocketId = connectedUsers.get(data.callerId);
       if (callerSocketId) {
@@ -49,16 +44,12 @@ export function initSocketServer(server: HttpServer) {
       }
     });
 
-    // 🔥 4. NOUVEAU : GESTION DU CHAT EN TEMPS RÉEL (1v1 ou Salon Public)
-    // Les utilisateurs rejoignent une "Room" virtuelle Socket.io basée sur l'ID du salon (callID ou roomID)
     socket.on('join_room_chat', (roomID: string) => {
       socket.join(roomID);
       console.log(`💬 Le canal ${socket.id} a rejoint le salon de discussion : ${roomID}`);
     });
 
-    // Interception et redistribution instantanée du message textuel (ou du cadeau !)
     socket.on('send_room_message', (data: { roomID: string; senderName: string; text: string; isGift?: boolean }) => {
-      // .to(roomID) envoie le message à TOUT LE MONDE dans le salon sauf à celui qui l'a écrit
       socket.to(data.roomID).emit('receive_room_message', {
         id: Date.now().toString(),
         sender: data.senderName,
@@ -68,7 +59,60 @@ export function initSocketServer(server: HttpServer) {
       console.log(`📩 Message de [${data.senderName}] relayé dans le salon [${data.roomID}]`);
     });
 
-    // 🚪 5. NETTOYAGE : L'utilisateur ferme l'application
+        // 💬 CHAT PRIVÉ 1-À-1 (persistant en base de données)
+    socket.on('send_private_message', async (data: { 
+      senderId: string; 
+      receiverId: string; 
+      content: string | null; 
+      type?: 'TEXT' | 'IMAGE' | 'VIDEO'; 
+      mediaUrl?: string; 
+    }) => {
+      try {
+        const savedMessage = await prisma.message.create({
+          data: {
+            senderId: data.senderId,
+            receiverId: data.receiverId,
+            content: data.content,
+            type: data.type || 'TEXT',
+            mediaUrl: data.mediaUrl || null,
+          },
+        });
+
+        const targetSocketId = connectedUsers.get(data.receiverId);
+        if (targetSocketId) {
+          io.to(targetSocketId).emit('receive_private_message', savedMessage);
+        }
+
+        socket.emit('message_sent_confirmation', savedMessage);
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde du message privé:', error);
+        socket.emit('message_error', { message: "Erreur lors de l'envoi du message." });
+      }
+    });
+
+    // ✅ ACCUSÉS DE LECTURE : marque tous les messages d'une conversation comme lus
+    // 👇 Bien à l'intérieur de io.on('connection', ...) maintenant, sinon "socket" n'existe pas ici
+    socket.on('mark_as_read', async (data: { readerId: string; otherUserId: string }) => {
+      try {
+        await prisma.message.updateMany({
+          where: {
+            senderId: data.otherUserId,
+            receiverId: data.readerId,
+            isRead: false,
+          },
+          data: { isRead: true },
+        });
+
+        const senderSocketId = connectedUsers.get(data.otherUserId);
+        if (senderSocketId) {
+          io.to(senderSocketId).emit('messages_marked_read', { readerId: data.readerId });
+        }
+      } catch (error) {
+        console.error('Erreur lors du marquage des messages comme lus:', error);
+      }
+    });
+
+    // 🚪 NETTOYAGE : L'utilisateur ferme l'application
     socket.on('disconnect', () => {
       for (const [userId, socketId] of connectedUsers.entries()) {
         if (socketId === socket.id) {
@@ -79,32 +123,23 @@ export function initSocketServer(server: HttpServer) {
       }
     });
 
-        // 💬 6. CHAT PRIVÉ 1-À-1 (persistant en base de données)
-    socket.on('send_private_message', async (data: { senderId: string; receiverId: string; content: string }) => {
-      try {
-        // On sauvegarde le message en base via Prisma (import prisma en haut du fichier)
-        const savedMessage = await prisma.message.create({
-          data: {
-            senderId: data.senderId,
-            receiverId: data.receiverId,
-            content: data.content,
-          },
-        });
-
-        // On envoie le message en direct au destinataire s'il est connecté
-        const targetSocketId = connectedUsers.get(data.receiverId);
-        if (targetSocketId) {
-          io.to(targetSocketId).emit('receive_private_message', savedMessage);
-        }
-
-        // On confirme aussi à l'expéditeur que le message est bien parti (pour mettre à jour son écran)
-        socket.emit('message_sent_confirmation', savedMessage);
-      } catch (error) {
-        console.error('Erreur lors de la sauvegarde du message privé:', error);
-        socket.emit('message_error', { message: "Erreur lors de l'envoi du message." });
+        // ✏️ 8. INDICATEUR "EN TRAIN D'ÉCRIRE..."
+    socket.on('typing_start', (data: { senderId: string; receiverId: string }) => {
+      const targetSocketId = connectedUsers.get(data.receiverId);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('user_typing', { userId: data.senderId });
       }
     });
-  });
+
+    socket.on('typing_stop', (data: { senderId: string; receiverId: string }) => {
+      const targetSocketId = connectedUsers.get(data.receiverId);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('user_stopped_typing', { userId: data.senderId });
+      }
+    });
+  }); // 👈 fin de io.on('connection', ...)
+
+  
 
   return io;
 }

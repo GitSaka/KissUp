@@ -25,6 +25,13 @@ enum TabCategory {
   FEATURED
 }
 
+// 👇 Nouvel enum pour typer le contenu d'un message
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+}
+
 model User {
   id           String      @id @default(uuid())
   phone        String?     @unique
@@ -46,13 +53,11 @@ model User {
   isOnline     Boolean     @default(false)
   lastSeen     DateTime    @default(now())
 
-  // Nouveaux champs pour correspondre à l'accueil
   distance     String?     @default("1.0 km")
   isVerified   Boolean     @default(false)
-  activeCall   CallType?   // AUDIO, VIDEO ou null
+  activeCall   CallType?
   tabCategory  TabCategory @default(RECOMMENDED)
 
-  // Relations
   sentInteractions     UserInteraction[] @relation("SentInteractions")
   receivedInteractions UserInteraction[] @relation("ReceivedInteractions")
   
@@ -65,34 +70,37 @@ model User {
   @@map("users")
 }
 
-// Table pour gérer les likes / clics sur le bouton "HI" depuis l'accueil
 model UserInteraction {
   id         String   @id @default(uuid())
   senderId   String
   receiverId String
-  status     String   @default("liked") // 'liked', 'matched', etc.
+  status     String   @default("liked")
   
   sender     User     @relation("SentInteractions", fields: [senderId], references: [id], onDelete: Cascade)
   receiver   User     @relation("ReceivedInteractions", fields: [receiverId], references: [id], onDelete: Cascade)
 
   createdAt  DateTime @default(now())
 
-  @@unique([senderId, receiverId]) // Empêche de doubler les likes entre les mêmes personnes
+  @@unique([senderId, receiverId])
   @@map("user_interactions")
 }
 
-// Table pour les messages du futur onglet Chat
+// Table pour les messages de l'onglet Chat/Messages
 model Message {
-  id         String   @id @default(uuid())
+  id         String      @id @default(uuid())
   senderId   String
   receiverId String
-  content    String
-  isRead     Boolean  @default(false)
 
-  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  type       MessageType @default(TEXT)  // 👈 nouveau : TEXT, IMAGE ou VIDEO
+  content    String?                      // 👈 devient optionnel : texte du message (null si image/vidéo pure)
+  mediaUrl   String?                      // 👈 nouveau : URL Cloudinary si type = IMAGE ou VIDEO
 
-  createdAt  DateTime @default(now())
+  isRead     Boolean     @default(false)
+
+  sender     User        @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User        @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime    @default(now())
 
   @@map("messages")
 }
