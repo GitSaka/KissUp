@@ -59,13 +59,13 @@ export function initSocketServer(server: HttpServer) {
       console.log(`📩 Message de [${data.senderName}] relayé dans le salon [${data.roomID}]`);
     });
 
-        // 💬 CHAT PRIVÉ 1-À-1 (persistant en base de données)
-    socket.on('send_private_message', async (data: { 
+  socket.on('send_private_message', async (data: { 
       senderId: string; 
       receiverId: string; 
       content: string | null; 
-      type?: 'TEXT' | 'IMAGE' | 'VIDEO'; 
+      type?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'STICKER'; 
       mediaUrl?: string; 
+      durationSeconds?: number;
     }) => {
       try {
         const savedMessage = await prisma.message.create({
@@ -75,6 +75,7 @@ export function initSocketServer(server: HttpServer) {
             content: data.content,
             type: data.type || 'TEXT',
             mediaUrl: data.mediaUrl || null,
+            durationSeconds: data.durationSeconds || null,
           },
         });
 

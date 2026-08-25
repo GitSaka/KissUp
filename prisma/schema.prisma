@@ -30,6 +30,8 @@ enum MessageType {
   TEXT
   IMAGE
   VIDEO
+  AUDIO
+  STICKER
 }
 
 model User {
@@ -85,15 +87,15 @@ model UserInteraction {
   @@map("user_interactions")
 }
 
-// Table pour les messages de l'onglet Chat/Messages
 model Message {
   id         String      @id @default(uuid())
   senderId   String
   receiverId String
 
-  type       MessageType @default(TEXT)  // 👈 nouveau : TEXT, IMAGE ou VIDEO
-  content    String?                      // 👈 devient optionnel : texte du message (null si image/vidéo pure)
-  mediaUrl   String?                      // 👈 nouveau : URL Cloudinary si type = IMAGE ou VIDEO
+  type       MessageType @default(TEXT)
+  content    String?
+  mediaUrl   String?
+  durationSeconds Int?   // pour les messages vocaux
 
   isRead     Boolean     @default(false)
 
