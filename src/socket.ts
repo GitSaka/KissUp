@@ -22,29 +22,26 @@ export function initSocketServer(server: HttpServer) {
       }
     });
 
-    // 🛰️ AIGUILLAGE DU SIGNAL D'APPEL VIDÉO / AUDIO
-socket.on('initiate_call', (data: { callerId: string; callerName: string; receiverId: string; callID: string }) => {
-  console.log(`\n📞 [DEMANDE D'APPEL] De: ${data.callerName} (${data.callerId}) Vers l'ID recherché: ${data.receiverId}`);
-  
-  // Imprimer la liste complète des gens enregistrés pour comparer les écritures
-  console.log("👥 Liste des utilisateurs en ligne sur le serveur :", Array.from(connectedUsers.keys()));
+    socket.on('initiate_call', (data: { callerId: string; callerName: string; receiverId: string; callID: string; callType?: string }) => {
+        console.log(`\n📞 [DEMANDE D'APPEL] De: ${data.callerName} Vers: ${data.receiverId} Type: ${data.callType}`);
+        
+        const cleanReceiverId = String(data.receiverId).trim();
+        const targetSocketId = connectedUsers.get(cleanReceiverId);
 
-  // Forcer le typage en String pure pour éviter les pièges d'objets ou tableaux
-  const cleanReceiverId = String(data.receiverId).trim();
-  const targetSocketId = connectedUsers.get(cleanReceiverId);
+        if (targetSocketId) {
+          // 🚀 ON RELAIE TOUT LE PAQUET DONT LE CALL TYPE POUR ÉVITER LE CRASH FRONTEND
+          io.to(targetSocketId).emit('incoming_call_request', {
+            callerId: data.callerId,
+            callerName: data.callerName,
+            callID: data.callID,
+            callType: data.callType || 'VIDEO' // Sécurité par défaut
+          });
+          console.log(`🚀 [SONNERIE EN COURS] Signal envoyé au socket : ${targetSocketId}`);
+        } else {
+          socket.emit('call_error', { message: "L'utilisateur n'est pas connecté." });
+        }
+      });
 
-  if (targetSocketId) {
-    io.to(targetSocketId).emit('incoming_call_request', {
-      callerId: data.callerId,
-      callerName: data.callerName,
-      callID: data.callID
-    });
-    console.log(`🚀 [SONNERIE EN COURS] Signal envoyé au socket : ${targetSocketId}`);
-  } else {
-    console.log(`❌ [ÉCHEC APPEL] Impossible de faire sonner l'ID ${cleanReceiverId}. Il n'est pas dans la liste.`);
-    socket.emit('call_error', { message: "L'utilisateur n'est pas connecté ou est occupé." });
-  }
-});
 
 
         socket.on('reject_call', (data: { receiverId: string; callerId: string }) => {
