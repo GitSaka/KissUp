@@ -22,44 +22,55 @@ export function initSocketServer(server: HttpServer) {
       }
     });
 
-    socket.on('initiate_call', (data: { callerId: string; callerName: string; receiverId: string; callID: string }) => {
-      const targetSocketId = connectedUsers.get(data.receiverId);
-      if (targetSocketId) {
-        io.to(targetSocketId).emit('incoming_call_request', {
-          callerId: data.callerId,
-          callerName: data.callerName,
-          callID: data.callID
+    // 🛰️ AIGUILLAGE DU SIGNAL D'APPEL VIDÉO / AUDIO
+socket.on('initiate_call', (data: { callerId: string; callerName: string; receiverId: string; callID: string }) => {
+  console.log(`\n📞 [DEMANDE D'APPEL] De: ${data.callerName} (${data.callerId}) Vers l'ID recherché: ${data.receiverId}`);
+  
+  // Imprimer la liste complète des gens enregistrés pour comparer les écritures
+  console.log("👥 Liste des utilisateurs en ligne sur le serveur :", Array.from(connectedUsers.keys()));
+
+  // Forcer le typage en String pure pour éviter les pièges d'objets ou tableaux
+  const cleanReceiverId = String(data.receiverId).trim();
+  const targetSocketId = connectedUsers.get(cleanReceiverId);
+
+  if (targetSocketId) {
+    io.to(targetSocketId).emit('incoming_call_request', {
+      callerId: data.callerId,
+      callerName: data.callerName,
+      callID: data.callID
+    });
+    console.log(`🚀 [SONNERIE EN COURS] Signal envoyé au socket : ${targetSocketId}`);
+  } else {
+    console.log(`❌ [ÉCHEC APPEL] Impossible de faire sonner l'ID ${cleanReceiverId}. Il n'est pas dans la liste.`);
+    socket.emit('call_error', { message: "L'utilisateur n'est pas connecté ou est occupé." });
+  }
+});
+
+
+        socket.on('reject_call', (data: { receiverId: string; callerId: string }) => {
+          const callerSocketId = connectedUsers.get(data.callerId);
+          if (callerSocketId) {
+            io.to(callerSocketId).emit('call_rejected_by_user');
+            console.log(`🔴 Appel refusé. Notification renvoyée à l'appelant : ${data.callerId}`);
+          }
         });
-        console.log(`🔕 Signal envoyé à ${data.receiverId} pour l'appel de ${data.callerName}`);
-      } else {
-        socket.emit('call_error', { message: "L'utilisateur est actuellement hors ligne ou occupé." });
-      }
-    });
 
-    socket.on('reject_call', (data: { receiverId: string; callerId: string }) => {
-      const callerSocketId = connectedUsers.get(data.callerId);
-      if (callerSocketId) {
-        io.to(callerSocketId).emit('call_rejected_by_user');
-        console.log(`🔴 Appel refusé. Notification renvoyée à l'appelant : ${data.callerId}`);
-      }
-    });
+        socket.on('join_room_chat', (roomID: string) => {
+          socket.join(roomID);
+          console.log(`💬 Le canal ${socket.id} a rejoint le salon de discussion : ${roomID}`);
+        });
 
-    socket.on('join_room_chat', (roomID: string) => {
-      socket.join(roomID);
-      console.log(`💬 Le canal ${socket.id} a rejoint le salon de discussion : ${roomID}`);
-    });
+        socket.on('send_room_message', (data: { roomID: string; senderName: string; text: string; isGift?: boolean }) => {
+          socket.to(data.roomID).emit('receive_room_message', {
+            id: Date.now().toString(),
+            sender: data.senderName,
+            text: data.text,
+            isGift: data.isGift || false
+          });
+          console.log(`📩 Message de [${data.senderName}] relayé dans le salon [${data.roomID}]`);
+        });
 
-    socket.on('send_room_message', (data: { roomID: string; senderName: string; text: string; isGift?: boolean }) => {
-      socket.to(data.roomID).emit('receive_room_message', {
-        id: Date.now().toString(),
-        sender: data.senderName,
-        text: data.text,
-        isGift: data.isGift || false
-      });
-      console.log(`📩 Message de [${data.senderName}] relayé dans le salon [${data.roomID}]`);
-    });
-
-  socket.on('send_private_message', async (data: { 
+    socket.on('send_private_message', async (data: { 
       senderId: string; 
       receiverId: string; 
       content: string | null; 
