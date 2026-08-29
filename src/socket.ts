@@ -121,16 +121,20 @@ export function initSocketServer(server: HttpServer) {
       }
     });
 
-    // 🚪 NETTOYAGE : L'utilisateur ferme l'application
-    socket.on('disconnect', () => {
-      for (const [userId, socketId] of connectedUsers.entries()) {
-        if (socketId === socket.id) {
-          connectedUsers.delete(userId);
-          console.log(`❌ Utilisateur hors-ligne : ${userId}`);
-          break;
-        }
-      }
+    socket.on('check_user_online', (userId: string, callback: (isOnline: boolean) => void) => {
+      callback(connectedUsers.has(userId));
     });
+
+    socket.on('disconnect', () => {
+  for (const [userId, socketId] of connectedUsers.entries()) {
+    if (socketId === socket.id) {
+      connectedUsers.delete(userId);
+      console.log(`❌ Utilisateur hors-ligne : ${userId}`);
+      io.emit('user_status_changed', { userId, isOnline: false }); // 👈 ajouté
+      break;
+    }
+  }
+});
 
         // ✏️ 8. INDICATEUR "EN TRAIN D'ÉCRIRE..."
     socket.on('typing_start', (data: { senderId: string; receiverId: string }) => {
@@ -146,6 +150,13 @@ export function initSocketServer(server: HttpServer) {
         io.to(targetSocketId).emit('user_stopped_typing', { userId: data.senderId });
       }
     });
+    socket.on('register_user', (userId: string) => {
+        if (userId) {
+          connectedUsers.set(userId, socket.id);
+          console.log(`🟢 Utilisateur en ligne : [ID: ${userId}] -> [Socket: ${socket.id}]`);
+          io.emit('user_status_changed', { userId, isOnline: true }); // 👈 ajouté
+        }
+      });
   }); // 👈 fin de io.on('connection', ...)
 
   
