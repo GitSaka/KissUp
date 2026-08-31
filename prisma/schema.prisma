@@ -113,9 +113,26 @@ model User {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
+  following   Follow[] @relation("UserFollowing")
+  followers   Follow[] @relation("UserFollowers")
+
   @@map("users")
 }
 
+
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String   // Celui qui s'abonne
+  followingId String   // Celui qui est suivi
+  
+  follower    User     @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@map("follows")
+}
 
 model UserInteraction {
   id         String   @id @default(uuid())
