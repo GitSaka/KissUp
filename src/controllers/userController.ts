@@ -88,7 +88,14 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
               imageUrl: true,
               createdAt: true,
             }
+          },
+
+          _count: {
+          select: {
+            followers: true,
+            following: true,
           }
+        }
         }
       });
     if (!user) {
