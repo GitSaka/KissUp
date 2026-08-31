@@ -78,3 +78,66 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
   }
 };
 
+
+export const updateUserProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    // Récupération sécurisée de l'ID depuis l'URL ou le token JWT
+    const targetUserId = req.params.id as string; // 👈 Forcer le typage en string
+    const authenticatedUserId = req.user?.userId;
+
+    // Optionnel mais recommandé : Vérifier que l'utilisateur modifie bien son propre profil
+    if (authenticatedUserId && targetUserId !== authenticatedUserId) {
+      res.status(403).json({ error: 'Action non autorisée.' });
+      return;
+    }
+
+    // Récupération des champs potentiels envoyés par le front (étape par étape)
+    const {
+      nickname,
+      bio,
+      age,
+      height,
+      city,
+      country,
+      continent,
+      maritalStatus,
+      relationGoal,
+    } = req.body;
+
+    // Mise à jour ciblée via Prisma : on n'met à jour que les champs fournis
+    const updatedUser = await prisma.user.update({
+      where: { id: targetUserId },
+      data: {
+        ...(nickname !== undefined && { nickname }),
+        ...(bio !== undefined && { bio }),
+        ...(age !== undefined && { age: age ? Number(age) : null }),
+        ...(height !== undefined && { height }),
+        ...(city !== undefined && { city }),
+        ...(country !== undefined && { country }),
+        ...(continent !== undefined && { continent }),
+        ...(maritalStatus !== undefined && { maritalStatus }),
+        ...(relationGoal !== undefined && { relationGoal: relationGoal as any }),
+      },
+      select: {
+        id: true,
+        nickname: true,
+        bio: true,
+        age: true,
+        height: true,
+        city: true,
+        country: true,
+        continent: true,
+        maritalStatus: true,
+        relationGoal: true,
+      }
+    });
+
+    res.status(200).json({
+      message: 'Profil mis à jour avec succès',
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error('Erreur updateUserProfile:', error);
+    res.status(500).json({ error: 'Erreur lors de la mise à jour du profil' });
+  }
+};

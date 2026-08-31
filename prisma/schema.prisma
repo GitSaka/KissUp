@@ -14,6 +14,14 @@ enum Gender {
   OTHER
 }
 
+enum RelationshipGoal {
+  LONG_TERM
+  SHORT_TERM
+  FRIENDSHIP
+  CASUAL
+  NOT_SURE
+}
+
 enum CallType {
   AUDIO
   VIDEO
@@ -25,13 +33,19 @@ enum TabCategory {
   FEATURED
 }
 
-// 👇 Nouvel enum pour typer le contenu d'un message
 enum MessageType {
   TEXT
   IMAGE
   VIDEO
   AUDIO
   STICKER
+}
+
+// Nouvel enum pour typer les publications Moments
+enum MomentType {
+  TEXT_ONLY
+  PHOTO
+  VIDEO
 }
 
 model User {
@@ -45,6 +59,15 @@ model User {
   gender       Gender      @default(MALE)
   bio          String?
   
+  // Nouveaux champs de profil demandés
+  age          Int?
+  height       String?     // ex: "1.82 m"
+  city         String?     // ex: "Porto-Novo"
+  country      String?     // ex: "Bénin"
+  continent    String?     // ex: "Afrique"
+  maritalStatus String?    // ex: "Célibataire"
+  relationGoal RelationshipGoal? @default(LONG_TERM) // Prêt(e) pour une relation amoureuse / type de recherche
+
   coins        Int         @default(0)
   diamonds     Int         @default(0)
   
@@ -60,11 +83,18 @@ model User {
   activeCall   CallType?
   tabCategory  TabCategory @default(RECOMMENDED)
 
+  // Relations existantes
   sentInteractions     UserInteraction[] @relation("SentInteractions")
   receivedInteractions UserInteraction[] @relation("ReceivedInteractions")
   
   sentMessages     Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
+
+  // Nouvelles relations pour les Moments et le Profil
+  moments          Moment[]
+  momentLikes      MomentLike[]
+  momentComments   MomentComment[]
+  photos           UserPhoto[]   @relation("UserGallery")
 
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
@@ -88,21 +118,83 @@ model UserInteraction {
 }
 
 model Message {
-  id         String      @id @default(uuid())
-  senderId   String
-  receiverId String
+  id              String      @id @default(uuid())
+  senderId        String
+  receiverId      String
 
-  type       MessageType @default(TEXT)
-  content    String?
-  mediaUrl   String?
-  durationSeconds Int?   // pour les messages vocaux
+  type            MessageType @default(TEXT)
+  content         String?
+  mediaUrl        String?
+  durationSeconds Int?
 
-  isRead     Boolean     @default(false)
+  isRead          Boolean     @default(false)
 
-  sender     User        @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver   User        @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender          User        @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver        User        @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
 
-  createdAt  DateTime    @default(now())
+  createdAt       DateTime    @default(now())
 
   @@map("messages")
+}
+
+// 📌 NOUVEAU : Modèle pour les publications "Moments"
+model Moment {
+  id           String        @id @default(uuid())
+  userId       String
+  content      String
+  type         MomentType    @default(TEXT_ONLY)
+  mediaUrls    String[]      // Tableau d'URLs pour les photos/vidéos
+  duration     String?       // Durée pour les vidéos (ex: "0:45")
+  
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes        MomentLike[]
+  comments     MomentComment[]
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("moments")
+}
+
+// 📌 NOUVEAU : Likes sur les Moments
+model MomentLike {
+  id       String @id @default(uuid())
+  momentId String
+  userId   String
+
+  moment   Moment @relation(fields: [momentId], references: [id], onDelete: Cascade)
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([momentId, userId])
+  @@map("moment_likes")
+}
+
+// 📌 NOUVEAU : Commentaires sur les Moments
+model MomentComment {
+  id        String   @id @default(uuid())
+  momentId  String
+  userId    String
+  text      String
+
+  moment    Moment   @relation(fields: [momentId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@map("moment_comments")
+}
+
+// 📌 NOUVEAU : Galerie photos supplémentaire pour la page de profil
+model UserPhoto {
+  id       String @id @default(uuid())
+  userId   String
+  imageUrl String
+
+  user     User   @relation("UserGallery", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@map("user_photos")
 }
