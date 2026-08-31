@@ -196,7 +196,8 @@ export const updateUserProfile = async (req: AuthenticatedRequest, res: Response
 
 export const addUserPhoto = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const userId = req.user?.id; 
+    const userId = req.user?.userId; 
+    
     console.log("Données reçues pour l'ajout de photo - userId:", userId, "body:", req.body);
 
     // On accepte soit req.body.url, soit req.body.imageUrl pour éviter le plantage 400
