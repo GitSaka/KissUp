@@ -57,6 +57,13 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
         diamonds: true,
         distance: true,
         isOnline: true,
+        age: true,          
+        height: true,       // 👈 Indispensable
+        city: true,         // 👈 Indispensable
+        country: true,      // 👈 Indispensable
+        continent: true,    // 👈 Indispensable
+        maritalStatus: true,// 👈 Indispensable
+        relationGoal: true, // 👈 Indispensable
         bio: true,
         wealthLevel: true,
         charmLevel: true,
