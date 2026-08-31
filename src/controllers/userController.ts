@@ -49,31 +49,38 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
     const user = await prisma.user.findUnique({
       where: { id }, // La ligne rouge s'efface immédiatement !
       select: {
-        id: true,
-        nickname: true,
-        avatar: true,
-        gender: true,
-        coins: true,
-        diamonds: true,
-        distance: true,
-        isOnline: true,
-        age: true,          
-        height: true,       // 👈 Indispensable
-        city: true,         // 👈 Indispensable
-        country: true,      // 👈 Indispensable
-        continent: true,    // 👈 Indispensable
-        maritalStatus: true,// 👈 Indispensable
-        relationGoal: true, // 👈 Indispensable
-        lifeStory:true,
-      studyPath:true,
-      idealPartner:true,
-        bio: true,
-        wealthLevel: true,
-        charmLevel: true,
-        activeCall: true,   // 👈 ajouté
-        isVerified: true,   // 👈 ajouté (tu en auras besoin pour le badge vérifié)
-       
-      }
+      id: true,
+      nickname: true,
+      avatar: true,
+      gender: true,
+      interestedIn: true,
+      coins: true,
+      diamonds: true,
+      distance: true,
+      isOnline: true,
+      age: true,          
+      height: true,       
+      city: true,         
+      country: true,      
+      continent: true,    
+      maritalStatus: true,
+      relationGoal: true, 
+      
+      // Les nouveaux champs du questionnaire "Racontez-vous"
+      primarySchool: true,
+      highSchool: true,
+      university: true,
+      favoriteFood: true,
+      passion: true,
+      futureMotivation: true,
+      idealPartner: true,
+      
+      bio: true,
+      wealthLevel: true,
+      charmLevel: true,
+      activeCall: true,   
+      isVerified: true,   
+    }
     });
 
     if (!user) {
@@ -111,8 +118,12 @@ export const updateUserProfile = async (req: AuthenticatedRequest, res: Response
       continent,
       maritalStatus,
       relationGoal,
-      lifeStory,
-      studyPath,
+      primarySchool,
+      highSchool,
+      university,
+      favoriteFood,
+      passion,
+      futureMotivation,
       idealPartner,
     } = req.body;
 
@@ -130,8 +141,12 @@ export const updateUserProfile = async (req: AuthenticatedRequest, res: Response
         ...(continent !== undefined && { continent }),
         ...(maritalStatus !== undefined && { maritalStatus }),
         ...(relationGoal !== undefined && { relationGoal: relationGoal as any }),
-        ...(lifeStory !== undefined && { lifeStory }),
-        ...(studyPath !== undefined && { studyPath }),
+        ...(primarySchool !== undefined && { primarySchool }),
+        ...(highSchool !== undefined && { highSchool }),
+        ...(university !== undefined && { university }),
+        ...(favoriteFood !== undefined && { favoriteFood }),
+        ...(passion !== undefined && { passion }),
+        ...(futureMotivation !== undefined && { futureMotivation }),
         ...(idealPartner !== undefined && { idealPartner }),
       },
       select: {

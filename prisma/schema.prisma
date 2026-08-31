@@ -64,6 +64,14 @@ model User {
   lifeStory       String?           @db.Text // Son histoire
   studyPath       String?           @db.Text // Son parcours d'études / professionnel
   idealPartner    String?
+
+  primarySchool   String?           // Où avez-vous fait votre école primaire ?
+  highSchool      String?           // Où avez-vous fait votre cours secondaire ?
+  university      String?           // Votre parcours universitaire ?
+  favoriteFood    String?           // Votre nourriture préférée ?
+  passion         String?           // Votre passion principale ?
+  futureMotivation String?          // Votre motivation pour l'avenir ?
+  
   
   // Nouveaux champs de profil demandés
   age          Int?
