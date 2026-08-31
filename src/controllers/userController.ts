@@ -227,6 +227,40 @@ export const addUserPhoto = async (req: AuthenticatedRequest, res: Response): Pr
 };
 
 
+export const updateProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId; // Utilise userId selon ton middleware verifyJwt
+    if (!userId) {
+      res.status(401).json({ error: "Non autorisé." });
+      return;
+    }
+
+    // Récupère les champs que l'on souhaite autoriser à modifier (ici l'avatar, mais tu pourras y ajouter la bio, l'âge, etc.)
+    const { avatar, bio, age, height, city, country, continent, maritalStatus, relationGoal } = req.body;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(avatar && { avatar }),
+        ...(bio !== undefined && { bio }),
+        ...(age !== undefined && { age }),
+        ...(height !== undefined && { height }),
+        ...(city !== undefined && { city }),
+        ...(country !== undefined && { country }),
+        ...(continent !== undefined && { continent }),
+        ...(maritalStatus !== undefined && { maritalStatus }),
+        ...(relationGoal !== undefined && { relationGoal }),
+      },
+    });
+
+    res.status(200).json({ message: "Profil mis à jour avec succès", user: updatedUser });
+  } catch (error) {
+    console.error("Erreur updateProfile:", error);
+    res.status(500).json({ error: "Erreur serveur lors de la mise à jour du profil." });
+  }
+};
+
+
 //delete photo
 export const deleteUserPhoto = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
