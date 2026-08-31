@@ -194,53 +194,63 @@ export const updateUserProfile = async (req: AuthenticatedRequest, res: Response
 };
 
 
-
-// 📸 1. Ajouter une photo dans la galerie
 export const addUserPhoto = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const userId = req.user?.userId; // ID de l'utilisateur connecté
-    const { imageUrl } = req.body;
+    const userId = req.user?.id; 
+    console.log("Données reçues pour l'ajout de photo - userId:", userId, "body:", req.body);
+
+    // On accepte soit req.body.url, soit req.body.imageUrl pour éviter le plantage 400
+    const imageUrl = req.body.url || req.body.imageUrl;
 
     if (!userId || !imageUrl) {
-      res.status(400).json({ error: "Données manquantes ou utilisateur non authentifié." });
+      res.status(400).json({ error: "Données manquantes (userId ou URL de l'image)." });
       return;
     }
 
-    // Vérifier la limite de 8 photos
-    const photoCount = await prisma.userPhoto.count({ where: { userId } });
-    if (photoCount >= 8) {
+    // Vérification de la limite des 8 photos
+    const count = await prisma.userPhoto.count({ where: { userId } });
+    if (count >= 8) {
       res.status(400).json({ error: "Limite de 8 photos atteinte." });
       return;
     }
 
     const newPhoto = await prisma.userPhoto.create({
-      data: {
-        userId,
-        imageUrl,
-      }
+      data: { userId, imageUrl },
     });
 
     res.status(201).json({ message: "Photo ajoutée avec succès", photo: newPhoto });
   } catch (error) {
-    console.error("Erreur addUserPhoto:", error);
+    console.error("Erreur addUserPhoto détaillée:", error);
     res.status(500).json({ error: "Erreur serveur lors de l'ajout de la photo." });
   }
 };
 
-// 🗑️ 2. Supprimer une photo de la galerie
+
+//delete photo
 export const deleteUserPhoto = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const rawId = req.params.photoId;
-    const photoId = Array.isArray(rawId) ? rawId[0] : rawId;
+    const userId = req.user?.id;
+    const rawPhotoId = req.params.photoId;
+    const photoId = Array.isArray(rawPhotoId) ? rawPhotoId[0] : rawPhotoId;
 
-    if (!photoId) {
-      res.status(400).json({ error: "ID de photo manquant." });
+    if (!userId || !photoId) {
+      res.status(400).json({ error: "Paramètres manquants ou non valides." });
       return;
     }
 
-    await prisma.userPhoto.delete({
-      where: { id: photoId }
-    });
+    const photo = await prisma.userPhoto.findUnique({ where: { id: photoId } });
+
+    if (!photo) {
+      res.status(404).json({ error: "Photo introuvable." });
+      return;
+    }
+
+    if (photo.userId !== userId) {
+      res.status(403).json({ error: "Action non autorisée." });
+      return;
+    }
+
+    await prisma.userPhoto.delete({ where: { id: photoId } });
 
     res.status(200).json({ message: "Photo supprimée avec succès." });
   } catch (error) {
