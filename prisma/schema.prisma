@@ -57,7 +57,13 @@ model User {
   avatar       String?
   
   gender       Gender      @default(MALE)
+  interestedIn    Gender?           // Genre recherché
   bio          String?
+
+  // Nouveaux champs narratifs
+  lifeStory       String?           @db.Text // Son histoire
+  studyPath       String?           @db.Text // Son parcours d'études / professionnel
+  idealPartner    String?
   
   // Nouveaux champs de profil demandés
   age          Int?

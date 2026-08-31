@@ -64,6 +64,9 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
         continent: true,    // 👈 Indispensable
         maritalStatus: true,// 👈 Indispensable
         relationGoal: true, // 👈 Indispensable
+        lifeStory:true,
+      studyPath:true,
+      idealPartner:true,
         bio: true,
         wealthLevel: true,
         charmLevel: true,
@@ -88,20 +91,19 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
 
 export const updateUserProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    // Récupération sécurisée de l'ID depuis l'URL ou le token JWT
-    const targetUserId = req.params.id as string; // 👈 Forcer le typage en string
+    const targetUserId = req.params.id as string;
     const authenticatedUserId = req.user?.userId;
 
-    // Optionnel mais recommandé : Vérifier que l'utilisateur modifie bien son propre profil
     if (authenticatedUserId && targetUserId !== authenticatedUserId) {
       res.status(403).json({ error: 'Action non autorisée.' });
       return;
     }
 
-    // Récupération des champs potentiels envoyés par le front (étape par étape)
     const {
       nickname,
       bio,
+      gender,
+      interestedIn,
       age,
       height,
       city,
@@ -109,14 +111,18 @@ export const updateUserProfile = async (req: AuthenticatedRequest, res: Response
       continent,
       maritalStatus,
       relationGoal,
+      lifeStory,
+      studyPath,
+      idealPartner,
     } = req.body;
 
-    // Mise à jour ciblée via Prisma : on n'met à jour que les champs fournis
     const updatedUser = await prisma.user.update({
       where: { id: targetUserId },
       data: {
         ...(nickname !== undefined && { nickname }),
         ...(bio !== undefined && { bio }),
+        ...(gender !== undefined && { gender: gender as any }),
+        ...(interestedIn !== undefined && { interestedIn: interestedIn as any }),
         ...(age !== undefined && { age: age ? Number(age) : null }),
         ...(height !== undefined && { height }),
         ...(city !== undefined && { city }),
@@ -124,11 +130,16 @@ export const updateUserProfile = async (req: AuthenticatedRequest, res: Response
         ...(continent !== undefined && { continent }),
         ...(maritalStatus !== undefined && { maritalStatus }),
         ...(relationGoal !== undefined && { relationGoal: relationGoal as any }),
+        ...(lifeStory !== undefined && { lifeStory }),
+        ...(studyPath !== undefined && { studyPath }),
+        ...(idealPartner !== undefined && { idealPartner }),
       },
       select: {
         id: true,
         nickname: true,
         bio: true,
+        gender: true,
+        interestedIn: true,
         age: true,
         height: true,
         city: true,
@@ -136,6 +147,9 @@ export const updateUserProfile = async (req: AuthenticatedRequest, res: Response
         continent: true,
         maritalStatus: true,
         relationGoal: true,
+        lifeStory: true,
+        studyPath: true,
+        idealPartner: true,
       }
     });
 
