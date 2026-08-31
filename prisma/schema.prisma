@@ -116,6 +116,7 @@ model User {
   @@map("users")
 }
 
+
 model UserInteraction {
   id         String   @id @default(uuid())
   senderId   String

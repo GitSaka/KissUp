@@ -47,42 +47,50 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
     const id = req.params.id as string;
 
     const user = await prisma.user.findUnique({
-      where: { id }, // La ligne rouge s'efface immédiatement !
-      select: {
-      id: true,
-      nickname: true,
-      avatar: true,
-      gender: true,
-      interestedIn: true,
-      coins: true,
-      diamonds: true,
-      distance: true,
-      isOnline: true,
-      age: true,          
-      height: true,       
-      city: true,         
-      country: true,      
-      continent: true,    
-      maritalStatus: true,
-      relationGoal: true, 
-      
-      // Les nouveaux champs du questionnaire "Racontez-vous"
-      primarySchool: true,
-      highSchool: true,
-      university: true,
-      favoriteFood: true,
-      passion: true,
-      futureMotivation: true,
-      idealPartner: true,
-      
-      bio: true,
-      wealthLevel: true,
-      charmLevel: true,
-      activeCall: true,   
-      isVerified: true,   
-    }
-    });
+        where: { id },
+        select: {
+          id: true,
+          nickname: true,
+          avatar: true,
+          gender: true,
+          interestedIn: true,
+          coins: true,
+          diamonds: true,
+          distance: true,
+          isOnline: true,
+          age: true,          
+          height: true,       
+          city: true,         
+          country: true,      
+          continent: true,    
+          maritalStatus: true,
+          relationGoal: true, 
+          
+          // Les champs du questionnaire "Racontez-vous"
+          primarySchool: true,
+          highSchool: true,
+          university: true,
+          favoriteFood: true,
+          passion: true,
+          futureMotivation: true,
+          idealPartner: true,
+          
+          bio: true,
+          wealthLevel: true,
+          charmLevel: true,
+          activeCall: true,   
+          isVerified: true,   
 
+          // 📸 On récupère les photos directement à l'intérieur du select !
+          photos: {
+            select: {
+              id: true,
+              imageUrl: true,
+              createdAt: true,
+            }
+          }
+        }
+      });
     if (!user) {
       res.status(404).json({ error: 'Utilisateur introuvable' });
       return;
@@ -175,5 +183,61 @@ export const updateUserProfile = async (req: AuthenticatedRequest, res: Response
   } catch (error) {
     console.error('Erreur updateUserProfile:', error);
     res.status(500).json({ error: 'Erreur lors de la mise à jour du profil' });
+  }
+};
+
+
+
+// 📸 1. Ajouter une photo dans la galerie
+export const addUserPhoto = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId; // ID de l'utilisateur connecté
+    const { imageUrl } = req.body;
+
+    if (!userId || !imageUrl) {
+      res.status(400).json({ error: "Données manquantes ou utilisateur non authentifié." });
+      return;
+    }
+
+    // Vérifier la limite de 8 photos
+    const photoCount = await prisma.userPhoto.count({ where: { userId } });
+    if (photoCount >= 8) {
+      res.status(400).json({ error: "Limite de 8 photos atteinte." });
+      return;
+    }
+
+    const newPhoto = await prisma.userPhoto.create({
+      data: {
+        userId,
+        imageUrl,
+      }
+    });
+
+    res.status(201).json({ message: "Photo ajoutée avec succès", photo: newPhoto });
+  } catch (error) {
+    console.error("Erreur addUserPhoto:", error);
+    res.status(500).json({ error: "Erreur serveur lors de l'ajout de la photo." });
+  }
+};
+
+// 🗑️ 2. Supprimer une photo de la galerie
+export const deleteUserPhoto = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const rawId = req.params.photoId;
+    const photoId = Array.isArray(rawId) ? rawId[0] : rawId;
+
+    if (!photoId) {
+      res.status(400).json({ error: "ID de photo manquant." });
+      return;
+    }
+
+    await prisma.userPhoto.delete({
+      where: { id: photoId }
+    });
+
+    res.status(200).json({ message: "Photo supprimée avec succès." });
+  } catch (error) {
+    console.error("Erreur deleteUserPhoto:", error);
+    res.status(500).json({ error: "Erreur serveur lors de la suppression." });
   }
 };
