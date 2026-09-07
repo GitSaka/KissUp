@@ -5,6 +5,7 @@ import authRoutes from './routes/auth.js';
 import zegoRoutes from './routes/index.js';
 import userRoutes from './routes/userRoutes.js';
 import messageRoutes from './routes/messageRoutes.js'; // 👈 nouveau
+import walletRoutes from './routes/wallet.routes.js';
 import { prisma } from './config/prisma.js';
 import { createServer } from 'http';
 import { initSocketServer } from './socket.js';
@@ -23,6 +24,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/zego', zegoRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes); // 👈 nouveau
+app.use('/api/wallet', walletRoutes); // 👈 nouveau
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Serveur SUGO prêt !' });

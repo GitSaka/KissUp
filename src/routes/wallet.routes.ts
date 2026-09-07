@@ -8,10 +8,10 @@ import { verifyJwt } from '../middlewares/authMiddleware.js';
 const router = Router();
 
 // 1. Initialiser le paiement direct (Mobile App -> Backend)
-router.post('/wallet/checkout', verifyJwt, initiateDirectPayment);
+router.post('/checkout', verifyJwt, initiateDirectPayment);
 
 // 2. Vérifier le statut en temps réel (Mobile App -> Backend -> FedaPay)
-router.get('/wallet/status', verifyJwt, checkPaymentStatus);
+router.get('/status', verifyJwt, checkPaymentStatus);
 
 // 3. Webhook de confirmation (FedaPay Server -> Backend) - Route publique
 router.post('/webhooks/fedapay', handleFedaPayWebhook);
