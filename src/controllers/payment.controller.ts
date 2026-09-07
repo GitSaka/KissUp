@@ -10,7 +10,7 @@ const FEDAPAY_BASE_URL =
 
 export async function initiateDirectPayment(req: any, res: Response): Promise<any> {
   try {
-    const userId = req.user?.id; // Via ton middleware JWT
+    const userId = req.user?.userId; // Via ton middleware JWT
     const { amountCoins, totalPaid, clientPhone, network, clientName } = req.body;
 
     if (!userId || !totalPaid || !clientPhone || !network || !amountCoins) {
