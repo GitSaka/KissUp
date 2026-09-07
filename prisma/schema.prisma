@@ -8,6 +8,8 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ==================== ENUMS ====================
+
 enum Gender {
   MALE
   FEMALE
@@ -41,89 +43,117 @@ enum MessageType {
   STICKER
 }
 
-// Nouvel enum pour typer les publications Moments
 enum MomentType {
   TEXT_ONLY
   PHOTO
   VIDEO
 }
 
+// 💰 Enums financiers
+enum TransactionType {
+  TOPUP            // Achat de coins via FedaPay / CinetPay (Argent réel -> Coins)
+  GIFT_SEND        // Dépense de coins pour envoyer un cadeau
+  GIFT_RECEIVE     // Réception de diamants suite à un cadeau reçu
+  CALL_SPEND       // Dépense pour un appel payant
+  MESSAGE_SPEND    // Dépense pour un message payant
+  WITHDRAWAL       // Retrait de diamants vers de l'argent réel (Mobile Money)
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+// ==================== MODELS ====================
+
 model User {
-  id           String      @id @default(uuid())
-  phone        String?     @unique
-  email        String?     @unique
-  password     String
-  nickname     String
-  avatar       String?
+  id               String            @id @default(uuid())
+  phone            String?           @unique
+  email            String?           @unique
+  password         String
+  nickname         String
+  avatar           String?
   
-  gender       Gender      @default(MALE)
-  interestedIn    Gender?           // Genre recherché
-  bio          String?
+  gender           Gender            @default(MALE)
+  interestedIn     Gender?           
+  bio              String?
 
-  // Nouveaux champs narratifs
-  lifeStory       String?           @db.Text // Son histoire
-  studyPath       String?           @db.Text // Son parcours d'études / professionnel
-  idealPartner    String?
+  // Champs narratifs
+  lifeStory        String?           @db.Text
+  studyPath        String?           @db.Text
+  idealPartner     String?
 
-  primarySchool   String?           // Où avez-vous fait votre école primaire ?
-  highSchool      String?           // Où avez-vous fait votre cours secondaire ?
-  university      String?           // Votre parcours universitaire ?
-  favoriteFood    String?           // Votre nourriture préférée ?
-  passion         String?           // Votre passion principale ?
-  futureMotivation String?          // Votre motivation pour l'avenir ?
+  primarySchool    String?
+  highSchool       String?
+  university       String?
+  favoriteFood     String?
+  passion          String?
+  futureMotivation String?
   
-  
-  // Nouveaux champs de profil demandés
-  age          Int?
-  height       String?     // ex: "1.82 m"
-  city         String?     // ex: "Porto-Novo"
-  country      String?     // ex: "Bénin"
-  continent    String?     // ex: "Afrique"
-  maritalStatus String?    // ex: "Célibataire"
-  relationGoal RelationshipGoal? @default(LONG_TERM) // Prêt(e) pour une relation amoureuse / type de recherche
+  // Infos physiques & géoloc
+  age              Int?
+  height           String?
+  city             String?
+  country          String?
+  continent        String?
+  maritalStatus    String?
+  relationGoal     RelationshipGoal? @default(LONG_TERM)
 
-  coins        Int         @default(0)
-  diamonds     Int         @default(0)
+  // 💰 Soldes financiers & Niveaux
+  coins            Int               @default(0)
+  diamonds         Int               @default(0)
+  wealthLevel      Int               @default(1)
+  charmLevel       Int               @default(1)
+  isVip            Boolean           @default(false)
   
-  wealthLevel  Int         @default(1)
-  charmLevel   Int         @default(1)
-  isVip        Boolean     @default(false)
-  
-  isOnline     Boolean     @default(false)
-  lastSeen     DateTime    @default(now())
+  isOnline         Boolean           @default(false)
+  lastSeen         DateTime          @default(now())
 
-  distance     String?     @default("1.0 km")
-  isVerified   Boolean     @default(false)
-  activeCall   CallType?
-  tabCategory  TabCategory @default(RECOMMENDED)
+  distance         String?           @default("1.0 km")
+  isVerified       Boolean           @default(false)
+  activeCall       CallType?
+  tabCategory      TabCategory       @default(RECOMMENDED)
 
-  // Relations existantes
+  // Relations sociales existantes
   sentInteractions     UserInteraction[] @relation("SentInteractions")
   receivedInteractions UserInteraction[] @relation("ReceivedInteractions")
   
-  sentMessages     Message[] @relation("SentMessages")
-  receivedMessages Message[] @relation("ReceivedMessages")
+  sentMessages         Message[]         @relation("SentMessages")
+  receivedMessages     Message[]         @relation("ReceivedMessages")
 
-  // Nouvelles relations pour les Moments et le Profil
-  moments          Moment[]
-  momentLikes      MomentLike[]
-  momentComments   MomentComment[]
-  photos           UserPhoto[]   @relation("UserGallery")
+  moments              Moment[]
+  momentLikes          MomentLike[]
+  momentComments       MomentComment[]
+  photos               UserPhoto[]       @relation("UserGallery")
 
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  following            Follow[]          @relation("UserFollowing")
+  followers            Follow[]          @relation("UserFollowers")
 
-  following   Follow[] @relation("UserFollowing")
-  followers   Follow[] @relation("UserFollowers")
+  // 💰 Nouvelles relations financières
+  transactions         Transaction[]     @relation("UserTransactions")
+  targetTransactions   Transaction[]     @relation("TargetUserTransactions")
+  sentGifts            GiftTransaction[] @relation("SentGifts")
+  receivedGifts        GiftTransaction[] @relation("ReceivedGifts")
+  withdrawals          WithdrawalRequest[] @relation("UserWithdrawals")
+
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
   @@map("users")
 }
 
-
 model Follow {
   id          String   @id @default(uuid())
-  followerId  String   // Celui qui s'abonne
-  followingId String   // Celui qui est suivi
+  followerId  String
+  followingId String
   
   follower    User     @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
   following   User     @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
@@ -169,26 +199,24 @@ model Message {
   @@map("messages")
 }
 
-// 📌 NOUVEAU : Modèle pour les publications "Moments"
 model Moment {
-  id           String        @id @default(uuid())
-  userId       String
-  content      String
-  type         MomentType    @default(TEXT_ONLY)
-  mediaUrls    String[]      // Tableau d'URLs pour les photos/vidéos
-  duration     String?       // Durée pour les vidéos (ex: "0:45")
+  id         String       @id @default(uuid())
+  userId     String
+  content    String
+  type       MomentType   @default(TEXT_ONLY)
+  mediaUrls  String[]
+  duration   String?
   
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  likes        MomentLike[]
-  comments     MomentComment[]
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes      MomentLike[]
+  comments   MomentComment[]
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
 
   @@map("moments")
 }
 
-// 📌 NOUVEAU : Likes sur les Moments
 model MomentLike {
   id       String @id @default(uuid())
   momentId String
@@ -203,7 +231,6 @@ model MomentLike {
   @@map("moment_likes")
 }
 
-// 📌 NOUVEAU : Commentaires sur les Moments
 model MomentComment {
   id        String   @id @default(uuid())
   momentId  String
@@ -218,7 +245,6 @@ model MomentComment {
   @@map("moment_comments")
 }
 
-// 📌 NOUVEAU : Galerie photos supplémentaire pour la page de profil
 model UserPhoto {
   id       String @id @default(uuid())
   userId   String
@@ -229,4 +255,88 @@ model UserPhoto {
   createdAt DateTime @default(now())
 
   @@map("user_photos")
+}
+
+// ==================== 💰 MODULE FINANCIER ====================
+
+// Catalogue des Cadeaux Virtuels
+model Gift {
+  id           String            @id @default(uuid())
+  name         String            // Nom du cadeau (ex: "Rose", "Voiture")
+  priceInCoins Int               // Coût d'achat en coins
+  iconUrl      String            // URL de l'image ou de l'animation
+  category     String?           @default("standard")
+  isActive     Boolean           @default(true)
+
+  transactions GiftTransaction[]
+
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@map("gifts")
+}
+
+// Journal de bord (Ledger) de toutes les opérations financières de la plateforme
+model Transaction {
+  id               String            @id @default(uuid())
+  userId           String            // L'acteur principal (celui qui initie ou reçoit)
+  targetUserId     String?           // Optionnel : L'autre utilisateur impliqué
+  
+  type             TransactionType   // TOPUP, GIFT_SEND, GIFT_RECEIVE, etc.
+  amountCoins      Int?              // Mouvement de coins (+ ou -)
+  amountDiamonds   Int?              // Mouvement de diamants (+ ou -)
+  fiatAmount       Float?            // Montant en argent réel (FedaPay / CinetPay)
+  fiatCurrency     String?           @default("XOF")
+  
+  gateway          String?           // "fedapay" ou "cinetpay"
+  gatewayReference String?           @unique // ID de transaction externe unique
+  
+  status           TransactionStatus @default(PENDING)
+  description      String?
+
+  user             User              @relation("UserTransactions", fields: [userId], references: [id], onDelete: Cascade)
+  targetUser       User?             @relation("TargetUserTransactions", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@map("transactions")
+}
+
+// Liaison précise d'un envoi de cadeau entre deux utilisateurs
+model GiftTransaction {
+  id            String   @id @default(uuid())
+  senderId      String
+  receiverId    String
+  giftId        String
+  quantity      Int      @default(1)
+  totalCoins    Int      // Coût total en coins
+  totalDiamonds Int      // Diamants reversés au receveur
+
+  sender        User     @relation("SentGifts", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver      User     @relation("ReceivedGifts", fields: [receiverId], references: [id], onDelete: Cascade)
+  gift          Gift     @relation(fields: [giftId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+
+  @@map("gift_transactions")
+}
+
+// Demandes de retrait (Payout) de diamants vers Mobile Money
+model WithdrawalRequest {
+  id             String           @id @default(uuid())
+  userId         String
+  diamondsAmount Int              // Nombre de diamants convertis
+  fiatAmount     Float            // Équivalent en monnaie réelle (XOF)
+  phoneNumber    String           // Numéro Mobile Money du bénéficiaire
+  provider       String           // ex: "MTN_MOMO", "MOOV_BENIN"
+  status         WithdrawalStatus @default(PENDING)
+  adminNote      String?
+
+  user           User             @relation("UserWithdrawals", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@map("withdrawal_requests")
 }
