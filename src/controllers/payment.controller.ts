@@ -3,10 +3,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const FEDAPAY_BASE_URL =
-  process.env.FEDAPAY_ENV === "live"
-    ? "https://api.fedapay.com/v1"
-    : "https://sandbox-api.fedapay.com/v1";
+const FEDAPAY_BASE_URL =  "https://sandbox-api.fedapay.com/v1";
 
 export async function initiateDirectPayment(req: any, res: Response): Promise<any> {
   try {
