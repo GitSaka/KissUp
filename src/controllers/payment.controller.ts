@@ -13,6 +13,8 @@ export async function initiateDirectPayment(req: any, res: Response): Promise<an
     const userId = req.user?.userId; // Via ton middleware JWT
     const { amountCoins, totalPaid, clientPhone, network, clientName } = req.body;
 
+    console.log(FEDAPAY_BASE_URL,amountCoins,userId,totalPaid,clientPhone,network,clientName)
+
     if (!userId || !totalPaid || !clientPhone || !network || !amountCoins) {
       return res.status(400).json({ error: "Paramètres de paiement manquants." });
     }
