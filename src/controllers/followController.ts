@@ -75,7 +75,7 @@ export const toggleFollow = async (req: AuthenticatedRequest, res: Response): Pr
   }
 };
 
-// 2. Récupérer les utilisateurs (avec l'état isLiked pour l'utilisateur connecté)
+// 2. Récupérer les utilisateurs avec l'état isLiked exact pour l'utilisateur connecté
 export const getUsersWithLikeStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const currentUserId = req.user?.userId;
@@ -96,18 +96,22 @@ export const getUsersWithLikeStatus = async (req: AuthenticatedRequest, res: Res
         avatar: true,
         isOnline: true,
         activeCall: true,
-        // On récupère les lignes où nous sommes le "follower" et l'autre est le "following"
-        following: {
-          where: { followingId: currentUserId }, // Ajuste selon le nom de ta relation inverse dans le schema Prisma
+        distance: true,
+        isVerified: true,
+        // On vérifie si l'utilisateur connecté (currentUserId) fait partie de ceux qui suivent ce profil,
+        // OU plus exactement : est-ce que l'utilisateur connecté a créé un follow vers cet utilisateur ?
+        // On interroge la liste des "followers" de cet utilisateur pour voir si "currentUserId" y est.
+        followers: {
+          where: { followerId: currentUserId },
         },
       },
     });
 
     // Transformer les données pour injecter un booléen simple "isLiked"
     const formattedUsers = users.map((user) => {
-      // Si le tableau following / followers contient une entrée, c'est que c'est liké
-      const isLiked = user.following.length > 0;
-      const { following, ...rest } = user;
+      // Si le tableau des followers contient l'ID de l'utilisateur connecté, c'est qu'il l'a liké
+      const isLiked = user.followers.length > 0;
+      const { followers, ...rest } = user;
       return {
         ...rest,
         isLiked,
