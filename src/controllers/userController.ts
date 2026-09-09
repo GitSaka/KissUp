@@ -3,20 +3,44 @@ import { prisma } from '../config/prisma.js'; // Ajustez selon votre chemin d'im
 import { AuthenticatedRequest } from '../middlewares/authMiddleware.js';
 
 
+
 export const getHomeUsers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { category } = req.query; // 'Recommandés', 'Nouveaux', 'En vedette'
+    const currentUserId = req.user?.userId;
 
-    // Traduction automatique des onglets frontend vers vos énumérations Prisma (TabCategory)
-    let dbCategory = 'RECOMMENDED';
-    if (category === 'Nouveaux') dbCategory = 'NEW';
-    if (category === 'En vedette') dbCategory = 'FEATURED';
+    let whereClause: any = {
+      // On exclut l'utilisateur connecté pour qu'il ne se voie pas lui-même
+      ...(currentUserId && { NOT: { id: currentUserId } }),
+    };
+    let orderBy: any = {};
 
-    // Récupération des profils en direct depuis Neon
+    // ⚡️ Logique dynamique selon l'onglet sélectionné sur l'application mobile
+    if (category === 'Nouveaux') {
+      // Les plus récents inscrits en premier (basé sur le champ createdAt de ton modèle)
+      orderBy = { createdAt: 'desc' };
+    } 
+    else if (category === 'En vedette') {
+      // Les profils populaires : d'abord les VIP, puis ceux qui ont le plus de charme et de richesse
+      orderBy = [
+        { isVip: 'desc' },
+        { charmLevel: 'desc' },
+        { wealthLevel: 'desc' }
+      ];
+    } 
+    else {
+      // 'Recommandés' (Par défaut) : D'abord ceux qui sont en ligne, puis une activité récente
+      orderBy = [
+        { isOnline: 'desc' },
+        { updatedAt: 'desc' }
+      ];
+    }
+
+    // Récupération des profils depuis Neon via Prisma
     const users = await prisma.user.findMany({
-      where: {
-        tabCategory: dbCategory as any,
-      },
+      where: whereClause,
+      orderBy: orderBy,
+      take: 30, // Limite raisonnable pour la performance de la page d'accueil
       select: {
         id: true,
         nickname: true,
@@ -27,20 +51,35 @@ export const getHomeUsers = async (req: AuthenticatedRequest, res: Response): Pr
         distance: true,
         isOnline: true,
         bio: true,
-         activeCall: true,   // 👈 ajouté
-        isVerified: true,   // 👈 ajouté (tu en auras besoin pour le badge vérifié)
-        charmLevel: true,   // 👈 ajouté (pour le levelKey/badge niveau)
+        activeCall: true,
+        isVerified: true,
+        charmLevel: true,
         wealthLevel: true,
+        isVip: true,
+        createdAt: true,
+        // 🔍 On vérifie si l'utilisateur connecté a déjà liké ce profil
+        followers: {
+          where: { followerId: currentUserId || '' },
+        },
       }
     });
 
-    res.status(200).json(users);
+    // Transformation pour injecter proprement le booléen isLiked attendu par ton front-end
+    const formattedUsers = users.map((user) => {
+      const isLiked = user.followers.length > 0;
+      const { followers, ...rest } = user;
+      return {
+        ...rest,
+        isLiked,
+      };
+    });
+
+    res.status(200).json(formattedUsers);
   } catch (error) {
-    console.error('Erreur getHomeUsers:', error);
-    res.status(500).json({ error: 'Erreur lors de la récupération des profils réels' });
+    console.error('Erreur getHomeUsers dynamique:', error);
+    res.status(500).json({ error: 'Erreur lors de la récupération des profils' });
   }
 };
-
 export const getUserProfileById = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     // 🔒 LE CORRECTIF : On force TypeScript à comprendre que l'ID est une chaîne pure
