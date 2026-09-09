@@ -137,6 +137,10 @@ model User {
   following            Follow[]          @relation("UserFollowing")
   followers            Follow[]          @relation("UserFollowers")
 
+  
+  visitors  ProfileVisitor[] @relation("VisitorRelation")
+  visiteds  ProfileVisitor[] @relation("VisitedRelation")
+
   // 💰 Nouvelles relations financières
   transactions         Transaction[]     @relation("UserTransactions")
   targetTransactions   Transaction[]     @relation("TargetUserTransactions")
@@ -148,6 +152,18 @@ model User {
   updatedAt            DateTime          @updatedAt
 
   @@map("users")
+}
+
+model ProfileVisitor {
+  id          String   @id @default(uuid())
+  visitorId   String   // Celui qui visite
+  visitedId   String   // Celui dont le profil est visité
+  visitedAt   DateTime @default(now()) // Date de la visite
+
+  visitor     User     @relation("VisitorRelation", fields: [visitorId], references: [id], onDelete: Cascade)
+  visited     User     @relation("VisitedRelation", fields: [visitedId], references: [id], onDelete: Cascade)
+
+  @@map("profile_visitors")
 }
 
 model Follow {
