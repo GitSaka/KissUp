@@ -40,8 +40,9 @@ export const getMomentsFeed = async (req: AuthenticatedRequest, res: Response): 
 
     let whereClause: any = {};
 
-    if (before) {
-      whereClause.createdAt = { lt: new Date(before) };
+    if (before && before !== 'undefined' && before !== 'null') {
+      const pivot = await prisma.moment.findUnique({ where: { id: String(before) }, select: { createdAt: true } });
+      if (pivot) whereClause.createdAt = { lt: pivot.createdAt };
     }
 
     // Gestion du filtre par onglet
