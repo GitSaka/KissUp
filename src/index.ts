@@ -7,6 +7,7 @@ import userRoutes from './routes/userRoutes.js';
 import messageRoutes from './routes/messageRoutes.js'; // 👈 nouveau
 import walletRoutes from './routes/wallet.routes.js';
 import followRoutes from './routes/followRoutes.js';
+import momentRoutes from './routes/momentRoutes.js';
 import { prisma } from './config/prisma.js';
 import { createServer } from 'http';
 import { initSocketServer } from './socket.js';
@@ -27,6 +28,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes); // 👈 nouveau
 app.use('/api/wallet', walletRoutes); // 👈 nouveau
 app.use('/api/follow', followRoutes); // 👈 nouveau
+app.use('/api/moments', momentRoutes); // 👈 nouveau
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Serveur SUGO prêt !' });
