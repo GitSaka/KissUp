@@ -8,7 +8,7 @@ async function main() {
   // 1. Nettoyage de sécurité pour éviter les doublons d'ID
   await prisma.gift.deleteMany({});
 
-  // 2. Le catalogue officiel enrichi (Avec iconUrl généré automatiquement pour le design)
+  // 2. Le catalogue officiel enrichi
   const giftsRaw = [
     // --- 🎭 PETITES ATTENTIONS & FUN ---
     { name: 'Brosse à dents 🪥', priceInCoins: 2, category: 'fun', isActive: true },
@@ -47,9 +47,9 @@ async function main() {
     { name: 'Fusée Spatiale VIP 🚀', priceInCoins: 50000, category: 'mythic', isActive: true },
   ];
 
-  // 3. Transformation automatique pour inclure l'iconUrl obligatoire réclamé par Prisma
+  // 3. Transformation automatique avec l'URL d'image corrigée
   for (const gift of giftsRaw) {
-    // Crée une image textuelle propre (ex: un carré avec écrit "Tomate") pour tes tests mobiles
+    // On extrait juste le premier mot pour faire un joli texte sur le placeholder
     const cleanName = encodeURIComponent(gift.name.split(' ')[0]);
     
     await prisma.gift.create({
@@ -58,8 +58,8 @@ async function main() {
         priceInCoins: gift.priceInCoins,
         category: gift.category,
         isActive: gift.isActive,
-        // 🚀 L'ASTUCE : Un lien d'image valide, propre et temporaire généré à la volée !
-        iconUrl: `https://placehold.co{cleanName}`
+        // 🚀 ICI : .png force le format image standard
+        iconUrl: `https://placehold.co/150.png?text=${cleanName}`
       },
     });
     console.log(`✅ Cadeau injecté : ${gift.name} -> [${gift.priceInCoins} coins]`);
@@ -71,6 +71,7 @@ async function main() {
 main()
   .catch((e) => {
     console.error('❌ Erreur critique lors du Seed :', e);
+    
   })
   .finally(async () => {
     await prisma.$disconnect();

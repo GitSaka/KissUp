@@ -86,15 +86,34 @@ export const getMomentsFeed = async (req: AuthenticatedRequest, res: Response): 
       },
     });
 
-    const formatted = moments.map((m) => {
+    const formatted = await moments.map(async(m) => {
       const totalCoinsReceived = m.giftTransactions.reduce(
         (sum, tx) => sum + tx.totalCoins,
         0
       );
 
+      let isMutualFollow = false;
+       // Si le post appartient à quelqu'un d'autre et que l'utilisateur est connecté, on calcule l'amitié
+        if (currentUserId && m.userId !== currentUserId) {
+          // 1. Est-ce que je suis l'auteur ?
+          const iFollowAuthor = await prisma.follow.findUnique({
+            where: { followerId_followingId: { followerId: currentUserId, followingId: m.userId } }
+          });
+
+          // 2. Est-ce que l'auteur me suit en retour ?
+          const authorFollowsMe = await prisma.follow.findUnique({
+            where: { followerId_followingId: { followerId: m.userId, followingId: currentUserId } }
+          });
+
+          isMutualFollow = !!(iFollowAuthor && authorFollowsMe);
+        }
+
       return {
         id: m.id,
-        author: m.user,
+        author: {
+            ...m.user,
+            isMutualFollow 
+          },
         type: m.type,
         content: m.content,
         mediaUrls: m.mediaUrls,
@@ -115,7 +134,8 @@ export const getMomentsFeed = async (req: AuthenticatedRequest, res: Response): 
   }
 };
 
-// 🔍 Un post précis
+
+// 🔍 Récupérer un post précis avec ses commentaires et calcul d'amitié (Style SUGO)
 export const getMomentById = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const currentUserId = req.user?.userId;
@@ -130,6 +150,13 @@ export const getMomentById = async (req: AuthenticatedRequest, res: Response): P
         _count: { select: { likes: true, comments: true } },
         likes: currentUserId ? { where: { userId: currentUserId } } : false,
         giftTransactions: { select: { totalCoins: true } },
+        // 🚀 AJOUT SUR : On récupère tous les commentaires liés à ce post avec l'avatar de l'auteur
+        comments: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            user: { select: { id: true, nickname: true, avatar: true } }
+          }
+        }
       },
     });
 
@@ -143,9 +170,25 @@ export const getMomentById = async (req: AuthenticatedRequest, res: Response): P
       0
     );
 
+    // 🚀 AJOUT SUR : Calcul du suivi mutuel exact pour le bouton d'appel
+    let isMutualFollow = false;
+    if (currentUserId && moment.userId !== currentUserId) {
+      const iFollowAuthor = await prisma.follow.findUnique({
+        where: { followerId_followingId: { followerId: currentUserId, followingId: moment.userId } }
+      });
+      const authorFollowsMe = await prisma.follow.findUnique({
+        where: { followerId_followingId: { followerId: moment.userId, followingId: currentUserId } }
+      });
+      isMutualFollow = !!(iFollowAuthor && authorFollowsMe);
+    }
+
     res.status(200).json({
       id: moment.id,
-      author: moment.user,
+      authorId: moment.userId, // Identifiant racine indispensable pour le bouton d'options
+      author: {
+        ...moment.user,
+        isMutualFollow
+      },
       type: moment.type,
       content: moment.content,
       mediaUrls: moment.mediaUrls,
@@ -156,12 +199,21 @@ export const getMomentById = async (req: AuthenticatedRequest, res: Response): P
       commentsCount: moment._count.comments,
       hasLiked: currentUserId ? moment.likes.length > 0 : false,
       createdAt: moment.createdAt,
+      // 🚀 AJOUT SUR : Formater les commentaires pour l'application mobile
+      comments: moment.comments.map(c => ({
+        id: c.id,
+        author: c.user.nickname,
+        avatar: c.user.avatar,
+        text: c.text,
+        createdAt: c.createdAt
+      }))
     });
   } catch (error) {
     console.error('Erreur getMomentById:', error);
     res.status(500).json({ error: 'Erreur lors de la récupération de la publication' });
   }
 };
+
 
 // ❤️ Toggle like
 export const toggleMomentLike = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
