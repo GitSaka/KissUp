@@ -110,7 +110,7 @@ export const getMomentsFeed = async (req: AuthenticatedRequest, res: Response): 
 
       return {
         id: m.id,
-        author: {
+       author: {
             ...m.user,
             isMutualFollow 
           },
@@ -134,8 +134,7 @@ export const getMomentsFeed = async (req: AuthenticatedRequest, res: Response): 
   }
 };
 
-
-// 🔍 Récupérer un post précis avec ses commentaires et calcul d'amitié (Style SUGO)
+// 🔍 Un post précis
 export const getMomentById = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const currentUserId = req.user?.userId;
@@ -150,13 +149,6 @@ export const getMomentById = async (req: AuthenticatedRequest, res: Response): P
         _count: { select: { likes: true, comments: true } },
         likes: currentUserId ? { where: { userId: currentUserId } } : false,
         giftTransactions: { select: { totalCoins: true } },
-        // 🚀 AJOUT SUR : On récupère tous les commentaires liés à ce post avec l'avatar de l'auteur
-        comments: {
-          orderBy: { createdAt: 'asc' },
-          include: {
-            user: { select: { id: true, nickname: true, avatar: true } }
-          }
-        }
       },
     });
 
@@ -170,25 +162,9 @@ export const getMomentById = async (req: AuthenticatedRequest, res: Response): P
       0
     );
 
-    // 🚀 AJOUT SUR : Calcul du suivi mutuel exact pour le bouton d'appel
-    let isMutualFollow = false;
-    if (currentUserId && moment.userId !== currentUserId) {
-      const iFollowAuthor = await prisma.follow.findUnique({
-        where: { followerId_followingId: { followerId: currentUserId, followingId: moment.userId } }
-      });
-      const authorFollowsMe = await prisma.follow.findUnique({
-        where: { followerId_followingId: { followerId: moment.userId, followingId: currentUserId } }
-      });
-      isMutualFollow = !!(iFollowAuthor && authorFollowsMe);
-    }
-
     res.status(200).json({
       id: moment.id,
-      authorId: moment.userId, // Identifiant racine indispensable pour le bouton d'options
-      author: {
-        ...moment.user,
-        isMutualFollow
-      },
+      author: moment.user,
       type: moment.type,
       content: moment.content,
       mediaUrls: moment.mediaUrls,
@@ -199,21 +175,12 @@ export const getMomentById = async (req: AuthenticatedRequest, res: Response): P
       commentsCount: moment._count.comments,
       hasLiked: currentUserId ? moment.likes.length > 0 : false,
       createdAt: moment.createdAt,
-      // 🚀 AJOUT SUR : Formater les commentaires pour l'application mobile
-      comments: moment.comments.map(c => ({
-        id: c.id,
-        author: c.user.nickname,
-        avatar: c.user.avatar,
-        text: c.text,
-        createdAt: c.createdAt
-      }))
     });
   } catch (error) {
     console.error('Erreur getMomentById:', error);
     res.status(500).json({ error: 'Erreur lors de la récupération de la publication' });
   }
 };
-
 
 // ❤️ Toggle like
 export const toggleMomentLike = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
