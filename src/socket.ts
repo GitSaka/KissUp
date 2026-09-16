@@ -52,6 +52,25 @@ export function initSocketServer(server: HttpServer) {
           }
         });
 
+                // 🎁 MODULE DE CADEAUX EN DIRECT (STYLE SUGO) : RETRANSMISSION DE L'ANIMATION
+        socket.on('send_live_gift', (data: { senderName: string; receiverId: string; giftIconUrl: string; giftName: string }) => {
+          console.log(`\n🎁 [CADEAU REÇU EN DIRECT] De: ${data.senderName} Vers l'ID: ${data.receiverId} Gift: ${data.giftName}`);
+          
+          const cleanReceiverId = String(data.receiverId).trim();
+          const targetSocketId = connectedUsers.get(cleanReceiverId);
+
+          // Si la fille est en ligne sur l'application, on lui envoie l'animation en direct !
+          if (targetSocketId) {
+            io.to(targetSocketId).emit('incoming_gift_animation', {
+              senderName: data.senderName,
+              giftIconUrl: data.giftIconUrl,
+              giftName: data.giftName
+            });
+            console.log(`🚀 Animation de cadeau propulsée en direct sur le socket : ${targetSocketId}`);
+          }
+        });
+
+
         socket.on('join_room_chat', (roomID: string) => {
           socket.join(roomID);
           console.log(`💬 Le canal ${socket.id} a rejoint le salon de discussion : ${roomID}`);

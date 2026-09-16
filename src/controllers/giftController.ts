@@ -59,14 +59,14 @@ export const sendGift = async (req: AuthenticatedRequest, res: Response): Promis
 
       // C. Enregistrer la GiftTransaction (avec liaison optionnelle au post via momentId)
       const giftTransaction = await tx.giftTransaction.create({
-        data: {
-          senderId,
-          receiverId,
-          giftId,
-          momentId: momentId || null,
-          quantity,
-          totalCoins: totalCoinsNeeded,
-          totalDiamonds: totalDiamondsEarned,
+         data: {
+          senderId: String(senderId),
+          receiverId: String(receiverId),
+          giftId: String(giftId),
+          momentId: momentId ? String(momentId) : null,
+          quantity: Number(quantity) || 1,
+          totalCoins: Number(totalCoinsNeeded),
+          totalDiamonds: Number(totalDiamondsEarned), // 🚀 REPLACÉ ET TYPÉ EN NUMBER !
         },
       });
 
@@ -103,5 +103,21 @@ export const sendGift = async (req: AuthenticatedRequest, res: Response): Promis
   } catch (error) {
     console.error("Erreur lors de l'envoi du cadeau:", error);
     res.status(500).json({ error: "Erreur interne du serveur." });
+  }
+};
+
+
+// 🚀 RENVOYER LE CATALOGUE DES CADEAUX RÉELS DE LA BASE NEON
+export const getGiftsCatalog = async (req: any, res: any): Promise<void> => {
+  try {
+    const gifts = await prisma.gift.findMany({
+      where: { isActive: true },
+      orderBy: { priceInCoins: 'asc' } // Trie du moins cher au plus cher
+    });
+
+    res.status(200).json(gifts);
+  } catch (error) {
+    console.error("Erreur lors de la récupération des cadeaux:", error);
+    res.status(500).json({ error: "Impossible de récupérer le catalogue des cadeaux." });
   }
 };
