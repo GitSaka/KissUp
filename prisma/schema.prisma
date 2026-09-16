@@ -218,7 +218,7 @@ model Message {
 model Moment {
   id         String       @id @default(uuid())
   userId     String
-  content    String
+  content    String?
   type       MomentType   @default(TEXT_ONLY)
   mediaUrls  String[]
   duration   String?

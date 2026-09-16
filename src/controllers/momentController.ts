@@ -17,7 +17,7 @@ export const createMoment = async (req: AuthenticatedRequest, res: Response): Pr
       data: {
         userId, // Clé étrangère Prisma correcte
         type,
-        content: content || null,
+        content: content !== undefined && content !== null ? String(content).trim() : "",
         mediaUrls: mediaUrls || [],
         duration: duration || null,
         isSponsored: isSponsored || false,
@@ -139,7 +139,7 @@ export const getMomentsFeed = async (req: AuthenticatedRequest, res: Response): 
 };
 
 
-// 🔍 Un post précis
+// 🔍 Récupérer un post précis avec ses commentaires réels peuplés (Fix 0 commentaire)
 export const getMomentById = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const currentUserId = req.user?.userId;
@@ -154,6 +154,13 @@ export const getMomentById = async (req: AuthenticatedRequest, res: Response): P
         _count: { select: { likes: true, comments: true } },
         likes: currentUserId ? { where: { userId: currentUserId } } : false,
         giftTransactions: { select: { totalCoins: true } },
+        // 🚀 LE FIX EN OR : On va chercher tous les commentaires liés, triés du plus ancien au plus récent
+        comments: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            user: { select: { id: true, nickname: true, avatar: true } }
+          }
+        }
       },
     });
 
@@ -167,9 +174,25 @@ export const getMomentById = async (req: AuthenticatedRequest, res: Response): P
       0
     );
 
+    // Calcul du suivi réciproque pour ton bouton d'appel mobile SUGO
+    let isMutualFollow = false;
+    if (currentUserId && moment.userId !== currentUserId) {
+      const iFollowAuthor = await prisma.follow.findUnique({
+        where: { followerId_followingId: { followerId: currentUserId, followingId: moment.userId } }
+      });
+      const authorFollowsMe = await prisma.follow.findUnique({
+        where: { followerId_followingId: { followerId: moment.userId, followingId: currentUserId } }
+      });
+      isMutualFollow = !!(iFollowAuthor && authorFollowsMe);
+    }
+
     res.status(200).json({
       id: moment.id,
-      author: moment.user,
+      authorId: moment.userId, // Clé racine indispensable pour les conditions d'affichage mobile
+      author: {
+        ...moment.user,
+        isMutualFollow
+      },
       type: moment.type,
       content: moment.content,
       mediaUrls: moment.mediaUrls,
@@ -180,12 +203,21 @@ export const getMomentById = async (req: AuthenticatedRequest, res: Response): P
       commentsCount: moment._count.comments,
       hasLiked: currentUserId ? moment.likes.length > 0 : false,
       createdAt: moment.createdAt,
+      // 🚀 TRANSMISSION VERS L'APPLI MOBILE : On convertit les lignes Prisma au format attendu par ton design
+      comments: moment.comments.map(c => ({
+        id: c.id,
+        author: c.user?.nickname || 'Utilisateur',
+        avatar: c.user?.avatar,
+        text: c.text,
+        createdAt: c.createdAt
+      }))
     });
   } catch (error) {
     console.error('Erreur getMomentById:', error);
     res.status(500).json({ error: 'Erreur lors de la récupération de la publication' });
   }
 };
+
 
 // ❤️ Toggle like
 export const toggleMomentLike = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
