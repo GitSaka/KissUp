@@ -54,7 +54,7 @@ export const getMomentsFeed = async (req: AuthenticatedRequest, res: Response): 
       });
       const followingIds = followingList.map((f) => f.followingId);
       
-      // On filtre pour n'afficher que les posts des gens qu'il suit (plus ses propres posts si tu veux)
+      // On filtre pour n'afficher que les posts des gens qu'il suit
       whereClause.userId = { in: [...followingIds, currentUserId] };
     }
 
@@ -63,7 +63,7 @@ export const getMomentsFeed = async (req: AuthenticatedRequest, res: Response): 
     if (tabCategory === 'NEW') {
       orderByCondition = [{ createdAt: 'desc' }];
     } else {
-      // Pour 'RECOMMENDED' : Priorité aux sponsorisés, puis tri par date (ou tu pourras y ajouter un tri par popularité)
+      // Pour 'RECOMMENDED' : Priorité aux sponsorisés, puis tri par date
       orderByCondition = [
         { isSponsored: 'desc' },
         { createdAt: 'desc' },
@@ -86,14 +86,16 @@ export const getMomentsFeed = async (req: AuthenticatedRequest, res: Response): 
       },
     });
 
-    const formatted = await moments.map(async(m) => {
-      const totalCoinsReceived = m.giftTransactions.reduce(
-        (sum, tx) => sum + tx.totalCoins,
-        0
-      );
+    // 🚀 LE FIX EN OR : Utilisation de Promise.all pour résoudre les requêtes asynchrones proprement
+    const formatted = await Promise.all(
+      moments.map(async (m) => {
+        const totalCoinsReceived = m.giftTransactions.reduce(
+          (sum, tx) => sum + tx.totalCoins,
+          0
+        );
 
-      let isMutualFollow = false;
-       // Si le post appartient à quelqu'un d'autre et que l'utilisateur est connecté, on calcule l'amitié
+        let isMutualFollow = false;
+        // Si le post appartient à quelqu'un d'autre et que l'utilisateur est connecté, on calcule l'amitié
         if (currentUserId && m.userId !== currentUserId) {
           // 1. Est-ce que je suis l'auteur ?
           const iFollowAuthor = await prisma.follow.findUnique({
@@ -108,24 +110,26 @@ export const getMomentsFeed = async (req: AuthenticatedRequest, res: Response): 
           isMutualFollow = !!(iFollowAuthor && authorFollowsMe);
         }
 
-      return {
-        id: m.id,
-       author: {
+        return {
+          id: m.id,
+          authorId: m.userId, // Clé racine indispensable pour ton application mobile
+          author: {
             ...m.user,
             isMutualFollow 
           },
-        type: m.type,
-        content: m.content,
-        mediaUrls: m.mediaUrls,
-        duration: m.duration,
-        isSponsored: m.isSponsored,
-        totalCoinsReceived,
-        likesCount: m._count.likes,
-        commentsCount: m._count.comments,
-        hasLiked: currentUserId ? m.likes.length > 0 : false,
-        createdAt: m.createdAt,
-      };
-    });
+          type: m.type,
+          content: m.content,
+          mediaUrls: m.mediaUrls,
+          duration: m.duration,
+          isSponsored: m.isSponsored,
+          totalCoinsReceived,
+          likesCount: m._count.likes,
+          commentsCount: m._count.comments,
+          hasLiked: currentUserId ? m.likes.length > 0 : false,
+          createdAt: m.createdAt,
+        };
+      })
+    ); // 🚀 Fin propre de la résolution Promise.all
 
     res.status(200).json({ moments: formatted, hasMore: moments.length === limit });
   } catch (error) {
@@ -133,6 +137,7 @@ export const getMomentsFeed = async (req: AuthenticatedRequest, res: Response): 
     res.status(500).json({ error: 'Erreur lors de la récupération des publications' });
   }
 };
+
 
 // 🔍 Un post précis
 export const getMomentById = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
