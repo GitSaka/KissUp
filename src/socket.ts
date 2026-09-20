@@ -15,14 +15,7 @@ export function initSocketServer(server: HttpServer) {
   io.on('connection', (socket: Socket) => {
     console.log(`🔌 Nouveau téléphone connecté au réseau : ${socket.id}`);
 
-    socket.on('register_user', (userId: string) => {
-      if (userId) {
-        connectedUsers.set(userId, socket.id);
-        console.log(`🟢 Utilisateur SUGO en ligne : [ID: ${userId}] -> [Socket: ${socket.id}]`);
-      }
-    });
-
-    socket.on('initiate_call', (data: { callerId: string; callerName: string; receiverId: string; callID: string; callType?: string }) => {
+      socket.on('initiate_call', (data: { callerId: string; callerName: string; receiverId: string; callID: string; callType?: string }) => {
         console.log(`\n📞 [DEMANDE D'APPEL] De: ${data.callerName} Vers: ${data.receiverId} Type: ${data.callType}`);
         
         const cleanReceiverId = String(data.receiverId).trim();
@@ -144,16 +137,33 @@ export function initSocketServer(server: HttpServer) {
       callback(connectedUsers.has(userId));
     });
 
-    socket.on('disconnect', () => {
-  for (const [userId, socketId] of connectedUsers.entries()) {
-    if (socketId === socket.id) {
-      connectedUsers.delete(userId);
-      console.log(`❌ Utilisateur hors-ligne : ${userId}`);
-      io.emit('user_status_changed', { userId, isOnline: false }); // 👈 ajouté
-      break;
-    }
-  }
-});
+        //  disconnect asynchrone connecté à Prisma
+    socket.on('disconnect', async () => {
+      for (const [userId, socketId] of connectedUsers.entries()) {
+        if (socketId === socket.id) {
+          connectedUsers.delete(userId);
+          console.log(`❌ Utilisateur hors-ligne : ${userId}`);
+          
+          try {
+            // 1. Mise à jour persistante dans ta base Neon (Statut + Heure de dernière connexion)
+            await prisma.user.update({
+              where: { id: userId },
+              data: { 
+                isOnline: false,
+                lastSeen: new Date() 
+              }
+            });
+          } catch (prismaErr) {
+            console.error(`Erreur Prisma isOnline false pour l'user ${userId}:`, prismaErr);
+          }
+
+          // 2. Alerte immédiate envoyée à toute l'application pour éteindre le point vert
+          io.emit('user_status_changed', { userId, isOnline: false });
+          break;
+        }
+      }
+    });
+
 
         // ✏️ 8. INDICATEUR "EN TRAIN D'ÉCRIRE..."
     socket.on('typing_start', (data: { senderId: string; receiverId: string }) => {
@@ -169,13 +179,27 @@ export function initSocketServer(server: HttpServer) {
         io.to(targetSocketId).emit('user_stopped_typing', { userId: data.senderId });
       }
     });
-    socket.on('register_user', (userId: string) => {
-        if (userId) {
-          connectedUsers.set(userId, socket.id);
-          console.log(`🟢 Utilisateur en ligne : [ID: ${userId}] -> [Socket: ${socket.id}]`);
-          io.emit('user_status_changed', { userId, isOnline: true }); // 👈 ajouté
+        // register_user asynchrone et connecté à Prisma
+    socket.on('register_user', async (userId: string) => {
+      if (userId) {
+        connectedUsers.set(userId, socket.id);
+        console.log(`🟢 Utilisateur en ligne : [ID: ${userId}] -> [Socket: ${socket.id}]`);
+        
+        try {
+          // 1. Mise à jour en base de données Neon pour que l'API HTTP lise le bon statut
+          await prisma.user.update({
+            where: { id: userId },
+            data: { isOnline: true }
+          });
+        } catch (prismaErr) {
+          console.error(`Erreur Prisma isOnline true pour l'user ${userId}:`, prismaErr);
         }
-      });
+
+        // 2. Alerte immédiate envoyée à tous les téléphones pour allumer le point vert (🟢)
+        io.emit('user_status_changed', { userId, isOnline: true });
+      }
+    });
+;
   }); // 👈 fin de io.on('connection', ...)
 
   

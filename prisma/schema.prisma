@@ -16,6 +16,12 @@ enum Gender {
   OTHER
 }
 
+enum NotificationType {
+  LIKE
+  VISIT
+  SYSTEM
+}
+
 enum RelationshipGoal {
   LONG_TERM
   SHORT_TERM
@@ -49,14 +55,13 @@ enum MomentType {
   VIDEO
 }
 
-// 💰 Enums financiers
 enum TransactionType {
-  TOPUP            // Achat de coins via FedaPay / CinetPay (Argent réel -> Coins)
-  GIFT_SEND        // Dépense de coins pour envoyer un cadeau
-  GIFT_RECEIVE     // Réception de diamants suite à un cadeau reçu
-  CALL_SPEND       // Dépense pour un appel payant
-  MESSAGE_SPEND    // Dépense pour un message payant
-  WITHDRAWAL       // Retrait de diamants vers de l'argent réel (Mobile Money)
+  TOPUP          // Achat de coins via FedaPay / CinetPay (Argent réel -> Coins)
+  GIFT_SEND      // Dépense de coins pour envoyer un cadeau
+  GIFT_RECEIVE   // Réception de diamants suite à un cadeau reçu
+  CALL_SPEND     // Dépense pour un appel payant
+  MESSAGE_SPEND  // Dépense pour un message payant
+  WITHDRAWAL     // Retrait de diamants vers de l'argent réel (Mobile Money)
 }
 
 enum TransactionStatus {
@@ -107,8 +112,8 @@ model User {
   maritalStatus    String?
   relationGoal     RelationshipGoal? @default(LONG_TERM)
 
-  // 💰 Soldes financiers & Niveaux
-  coins            Int               @default(0)
+  // 💰 Soldes financiers & Niveaux (🚀 Cadeau de 1000 pièces à l'inscription)
+  coins            Int               @default(1000)
   diamonds         Int               @default(0)
   wealthLevel      Int               @default(1)
   charmLevel       Int               @default(1)
@@ -122,7 +127,12 @@ model User {
   activeCall       CallType?
   tabCategory      TabCategory       @default(RECOMMENDED)
 
-  // Relations sociales existantes
+  // 🚀 Arsenal stratégique & Système
+  isBot            Boolean           @default(false) 
+  botStep          Int               @default(0)     
+  pushToken        String?                     
+
+  // Relations sociales
   sentInteractions     UserInteraction[] @relation("SentInteractions")
   receivedInteractions UserInteraction[] @relation("ReceivedInteractions")
   
@@ -136,12 +146,11 @@ model User {
 
   following            Follow[]          @relation("UserFollowing")
   followers            Follow[]          @relation("UserFollowers")
-
   
-  visitors  ProfileVisitor[] @relation("VisitorRelation")
-  visiteds  ProfileVisitor[] @relation("VisitedRelation")
+  visitors             ProfileVisitor[]  @relation("VisitorRelation")
+  visiteds             ProfileVisitor[]  @relation("VisitedRelation")
 
-  // 💰 Nouvelles relations financières
+  // 💰 Relations financières
   transactions         Transaction[]     @relation("UserTransactions")
   targetTransactions   Transaction[]     @relation("TargetUserTransactions")
   sentGifts            GiftTransaction[] @relation("SentGifts")
@@ -154,14 +163,32 @@ model User {
   @@map("users")
 }
 
-model ProfileVisitor {
-  id          String   @id @default(uuid())
-  visitorId   String   // Celui qui visite
-  visitedId   String   // Celui dont le profil est visité
-  visitedAt   DateTime @default(now()) // Date de la visite
+// ==================== CENTRE DE NOTIFICATIONS ====================
 
-  visitor     User     @relation("VisitorRelation", fields: [visitorId], references: [id], onDelete: Cascade)
-  visited     User     @relation("VisitedRelation", fields: [visitedId], references: [id], onDelete: Cascade)
+model Notification {
+  id          String           @id @default(uuid())
+  receiverId  String           // Celui qui reçoit la pastille rouge
+  senderId    String?          // L'auteur de l'action (ou null si SYSTEM)
+  type        NotificationType // LIKE, VISIT, SYSTEM
+  title       String           // Le titre de l'alerte
+  content     String           // Le texte de l'alerte
+  actionUrl   String?          // 🚀 L'URL cliquable pour Expo Router (ex: /profile/user_id)
+  isRead      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+
+  @@map("notifications")
+}
+
+// ==================== SECTIONS SOCIALES ====================
+
+model ProfileVisitor {
+  id         String   @id @default(uuid())
+  visitorId  String   
+  visitedId  String   
+  visitedAt  DateTime @default(now()) 
+
+  visitor    User     @relation("VisitorRelation", fields: [visitorId], references: [id], onDelete: Cascade)
+  visited    User     @relation("VisitedRelation", fields: [visitedId], references: [id], onDelete: Cascade)
 
   @@map("profile_visitors")
 }
@@ -216,27 +243,23 @@ model Message {
 }
 
 model Moment {
-  id         String       @id @default(uuid())
-  userId     String
-  content    String?
-  type       MomentType   @default(TEXT_ONLY)
-  mediaUrls  String[]
-  duration   String?
-
-  // 🚀 Nouveaux champs pour le Sponsoring / VIP
-  isSponsored    Boolean         @default(false)
+  id             String      @id @default(uuid())
+  userId         String
+  content        String?
+  type           MomentType  @default(TEXT_ONLY)
+  mediaUrls      String[]
+  duration       String?
+  isSponsored    Boolean     @default(false)
   sponsoredUntil DateTime?       
-  isVipPost      Boolean         @default(false)
+  isVipPost      Boolean     @default(false)
   
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  likes      MomentLike[]
-  comments   MomentComment[]
-
-  // 🎁 Relation avec les cadeaux reçus sur ce post précis
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes          MomentLike[]
+  comments       MomentComment[]
   giftTransactions GiftTransaction[]
 
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   @@map("moments")
 }
@@ -256,13 +279,13 @@ model MomentLike {
 }
 
 model MomentComment {
-  id        String   @id @default(uuid())
-  momentId  String
-  userId    String
-  text      String
+  id       String   @id @default(uuid())
+  momentId String
+  userId   String
+  text     String
 
-  moment    Moment   @relation(fields: [momentId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moment   Moment   @relation(fields: [momentId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
@@ -281,14 +304,13 @@ model UserPhoto {
   @@map("user_photos")
 }
 
-// ==================== 💰 MODULE FINANCIER ====================
+// ==================== 💰 MODULE FINANCIER COMPLET ====================
 
-// Catalogue des Cadeaux Virtuels
 model Gift {
   id           String            @id @default(uuid())
-  name         String            // Nom du cadeau (ex: "Rose", "Voiture")
-  priceInCoins Int               // Coût d'achat en coins
-  iconUrl      String            // URL de l'image ou de l'animation
+  name         String            
+  priceInCoins Int               
+  iconUrl      String            
   category     String?           @default("standard")
   isActive     Boolean           @default(true)
 
@@ -300,21 +322,17 @@ model Gift {
   @@map("gifts")
 }
 
-// Journal de bord (Ledger) de toutes les opérations financières de la plateforme
 model Transaction {
   id               String            @id @default(uuid())
-  userId           String            // L'acteur principal (celui qui initie ou reçoit)
-  targetUserId     String?           // Optionnel : L'autre utilisateur impliqué
-  
-  type             TransactionType   // TOPUP, GIFT_SEND, GIFT_RECEIVE, etc.
-  amountCoins      Int?              // Mouvement de coins (+ ou -)
-  amountDiamonds   Int?              // Mouvement de diamants (+ ou -)
-  fiatAmount       Float?            // Montant en argent réel (FedaPay / CinetPay)
+  userId           String            
+  targetUserId     String?           
+  type             TransactionType   
+  amountCoins      Int?              
+  amountDiamonds   Int?              
+  fiatAmount       Float?            
   fiatCurrency     String?           @default("XOF")
-  
-  gateway          String?           // "fedapay" ou "cinetpay"
-  gatewayReference String?           @unique // ID de transaction externe unique
-  
+  gateway          String?           
+  gatewayReference String?           @unique 
   status           TransactionStatus @default(PENDING)
   description      String?
 
@@ -327,7 +345,6 @@ model Transaction {
   @@map("transactions")
 }
 
-// Liaison précise d'un envoi de cadeau entre deux utilisateurs
 model GiftTransaction {
   id            String   @id @default(uuid())
   senderId      String
@@ -335,29 +352,26 @@ model GiftTransaction {
   giftId        String
   momentId      String?
   quantity      Int      @default(1)
-  totalCoins    Int      // Coût total en coins
-  totalDiamonds Int      // Diamants reversés au receveur
-
-  
+  totalCoins    Int      
+  totalDiamonds Int      
 
   sender        User     @relation("SentGifts", fields: [senderId], references: [id], onDelete: Cascade)
   receiver      User     @relation("ReceivedGifts", fields: [receiverId], references: [id], onDelete: Cascade)
   gift          Gift     @relation(fields: [giftId], references: [id], onDelete: Cascade)
-  moment        Moment?  @relation(fields: [momentId], references: [id], onDelete: SetNull) // 🎁 NOUVEAU
+  moment        Moment?  @relation(fields: [momentId], references: [id], onDelete: SetNull) 
 
   createdAt     DateTime @default(now())
 
   @@map("gift_transactions")
 }
 
-// Demandes de retrait (Payout) de diamants vers Mobile Money
 model WithdrawalRequest {
   id             String           @id @default(uuid())
   userId         String
-  diamondsAmount Int              // Nombre de diamants convertis
-  fiatAmount     Float            // Équivalent en monnaie réelle (XOF)
-  phoneNumber    String           // Numéro Mobile Money du bénéficiaire
-  provider       String           // ex: "MTN_MOMO", "MOOV_BENIN"
+  diamondsAmount Int              
+  fiatAmount     Float            
+  phoneNumber    String           
+  provider       String           
   status         WithdrawalStatus @default(PENDING)
   adminNote      String?
 

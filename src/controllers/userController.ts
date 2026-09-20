@@ -82,64 +82,86 @@ export const getHomeUsers = async (req: AuthenticatedRequest, res: Response): Pr
 };
 export const getUserProfileById = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    // 🔒 LE CORRECTIF : On force TypeScript à comprendre que l'ID est une chaîne pure
-    const id = req.params.id as string;
+    const currentUserId = req.user?.userId; // Celui qui clique pour regarder
+    const id = req.params.id as string; // Le profil qui est regardé
+
+    if (!currentUserId) {
+      res.status(401).json({ error: 'Non authentifié' });
+      return;
+    }
 
     const user = await prisma.user.findUnique({
-        where: { id },
-        select: {
-          id: true,
-          nickname: true,
-          avatar: true,
-          gender: true,
-          interestedIn: true,
-          coins: true,
-          diamonds: true,
-          distance: true,
-          isOnline: true,
-          age: true,          
-          height: true,       
-          city: true,         
-          country: true,      
-          continent: true,    
-          maritalStatus: true,
-          relationGoal: true, 
-          
-          // Les champs du questionnaire "Racontez-vous"
-          primarySchool: true,
-          highSchool: true,
-          university: true,
-          favoriteFood: true,
-          passion: true,
-          futureMotivation: true,
-          idealPartner: true,
-          
-          bio: true,
-          wealthLevel: true,
-          charmLevel: true,
-          activeCall: true,   
-          isVerified: true,   
-
-          // 📸 On récupère les photos directement à l'intérieur du select !
-          photos: {
-            select: {
-              id: true,
-              imageUrl: true,
-              createdAt: true,
-            }
-          },
-
-          _count: {
+      where: { id },
+      select: {
+        id: true,
+        nickname: true,
+        avatar: true,
+        gender: true,
+        interestedIn: true,
+        coins: true,
+        diamonds: true,
+        distance: true,
+        isOnline: true,
+        age: true,          
+        height: true,       
+        city: true,         
+        country: true,      
+        continent: true,    
+        maritalStatus: true,
+        relationGoal: true, 
+        primarySchool: true,
+        highSchool: true,
+        university: true,
+        favoriteFood: true,
+        passion: true,
+        futureMotivation: true,
+        idealPartner: true,
+        bio: true,
+        wealthLevel: true,
+        charmLevel: true,
+        activeCall: true,   
+        isVerified: true,   
+        photos: {
+          select: {
+            id: true,
+            imageUrl: true,
+            createdAt: true,
+          }
+        },
+        _count: {
           select: {
             followers: true,
             following: true,
           }
         }
-        }
-      });
+      }
+    });
+
     if (!user) {
       res.status(404).json({ error: 'Utilisateur introuvable' });
       return;
+    }
+
+    // 🚀 LES DEUX PREMIÈRES ÉTAPES LOGIQUES : Enregistrement et Propulsion de l'alerte !
+    if (currentUserId !== id) {
+      // 1. Sauvegarde instantanée de la visite dans ta table Prisma Notification
+      const nameOfVisitor = req.user?.nickname || 'Un utilisateur';
+      
+      const newNotification = await prisma.notification.create({
+        data: {
+          receiverId: id,            // Celui qui reçoit l'alerte
+          senderId: currentUserId,   // Celui qui a cliqué/visité
+          type: 'VISIT',
+          title: 'Nouvelle visite ! 👀',
+          content: `${nameOfVisitor} a visité votre profil.`,
+          actionUrl: `/profile/${currentUserId}`, // Permet au Frontend Expo Router de savoir où aller au clic !
+          isRead: false,
+        },
+      });
+
+      // 2. Émission du signal WebSockets (Optionnel : si le serveur io global est accessible ici)
+      // Si tu as un fichier d'export global pour io, tu pourras appeler :
+      // global.io.to(id).emit('incoming_notification_alert', newNotification);
     }
 
     res.status(200).json(user);
@@ -148,6 +170,7 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
     res.status(500).json({ error: 'Erreur lors du chargement du profil' });
   }
 };
+
 
 
 export const updateUserProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {

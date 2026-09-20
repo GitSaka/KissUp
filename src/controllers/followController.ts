@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { prisma } from '../config/prisma.js';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware.js';
 
-// 1. Liker / S'abonner (ou Annuler si déjà fait - Toggle)
+// 🚀 BLOC ÉTAPE PAR ÉTAPE : toggleFollow connecté au système de notifications cliquables Neon
 export const toggleFollow = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const followerId = req.user?.userId;
@@ -61,6 +61,25 @@ export const toggleFollow = async (req: AuthenticatedRequest, res: Response): Pr
 
       const isMatch = !!reverseFollow;
 
+      // 🚀 INSERTION ÉTAPE 1 : Création de la notification dans ta table Prisma
+      const myNickname = req.user?.nickname || 'Quelqu\'un';
+      const notificationTitle = isMatch ? "C'est un Match ! 💘" : "Nouveau coup de foudre ! ⚡";
+      const notificationContent = isMatch 
+        ? `Vous et ${myNickname} vous aimez mutuellement ! Discutez maintenant.` 
+        : `${myNickname} a aimé votre profil.`;
+
+      await prisma.notification.create({
+        data: {
+          receiverId: targetUserId,            // La fille ou l'homme ciblé qui reçoit la pastille rouge
+          senderId: followerId,               // Toi (l'expéditeur de l'action)
+          type: isMatch ? 'SYSTEM' : 'LIKE',  // Si c'est un match, on le traite en alerte système premium
+          title: notificationTitle,
+          content: notificationContent,
+          actionUrl: isMatch ? `/chat/${followerId}` : `/profile/${followerId}`, // 🚀 Malin : Si Match, redirige direct sur le chat ! Si simple like, sur le profil.
+          isRead: false
+        }
+      });
+
       res.status(201).json({ 
         success: true, 
         isLiked: true, 
@@ -74,6 +93,7 @@ export const toggleFollow = async (req: AuthenticatedRequest, res: Response): Pr
     res.status(500).json({ error: "Erreur interne du serveur." });
   }
 };
+
 
 // 2. Récupérer les utilisateurs avec l'état isLiked exact pour l'utilisateur connecté
 export const getUsersWithLikeStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
