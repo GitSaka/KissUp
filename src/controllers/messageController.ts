@@ -96,29 +96,29 @@ export const getConversationsList = async (req: AuthenticatedRequest, res: Respo
 };
 
 // 🧹 Route flash "Trois Traits" : Marquer l'ensemble des discussions privées comme lues d'un coup
-export const markAllAsRead = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const myId = req.user?.userId;
+// export const markAllAsRead = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+//   try {
+//     const myId = req.user?.userId;
 
-    if (!myId) {
-      res.status(401).json({ error: 'Non authentifié' });
-      return;
-    }
+//     if (!myId) {
+//       res.status(401).json({ error: 'Non authentifié' });
+//       return;
+//     }
 
-    // On passe à true tous les messages non lus destinés à l'utilisateur connecté
-    await prisma.message.updateMany({
-      where: { receiverId: myId, isRead: false },
-      data: { isRead: true }
-    });
+//     // On passe à true tous les messages non lus destinés à l'utilisateur connecté
+//     await prisma.message.updateMany({
+//       where: { receiverId: myId, isRead: false },
+//       data: { isRead: true }
+//     });
 
-    res.status(200).json({ success: true, message: 'Toutes les conversations ont été marquées comme lues.' });
-  } catch (error) {
-    console.error('Erreur markAllAsRead:', error);
-    res.status(500).json({ error: 'Erreur lors de la mise à jour des messages.' });
-  }
-};
+//     res.status(200).json({ success: true, message: 'Toutes les conversations ont été marquées comme lues.' });
+//   } catch (error) {
+//     console.error('Erreur markAllAsRead:', error);
+//     res.status(500).json({ error: 'Erreur lors de la mise à jour des messages.' });
+//   }
+// };
 
-// 🗑️ Route "Trois Traits" numéro 2 : Supprimer les conversations fantômes (sans message)
+// 🗑️ Route "Trois Traits" numéro 2 : Nettoyer les fils inactifs et unilatéraux (Version Corrigée)
 export const cleanupEmptyConversations = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const myId = req.user?.userId;
@@ -128,27 +128,30 @@ export const cleanupEmptyConversations = async (req: AuthenticatedRequest, res: 
       return;
     }
 
-    // 1. On cherche toutes les interactions de follow ou de match (les canaux ouverts)
-    // mais qui n'ont AUCUN message enregistré dans la table Message entre ces deux personnes.
-    // Pour nettoyer, on supprime simplement les lignes d'interactions vides liées à mon ID.
-    
-    // Note technique : Dans ton architecture, les conversations apparaissent parce qu'il y a un message.
-    // Si tu veux offrir à l'utilisateur la possibilité de masquer ou supprimer un fil entier,
-    // on peut aussi supprimer l'historique des messages reçus pour cet utilisateur.
-    
-    await prisma.message.deleteMany({
+    // 🕒 Seuil d'inactivité : On cible les messages datant de plus de 48 heures
+    const delayThreshold = new Date(Date.now() - 48 * 60 * 60 * 1000);
+
+    // 🚀 ACTION CHIRURGICALE : On supprime les messages unilatéraux anciens qui encombrent le fil.
+    // Cela fait disparaître de l'écran les conversations entamées mais sans aucune réponse.
+    const result = await prisma.message.deleteMany({
       where: {
         OR: [
-          { senderId: myId, content: null, mediaUrl: null },
-          { receiverId: myId, content: null, mediaUrl: null }
+          { senderId: myId, createdAt: { lt: delayThreshold } },
+          { receiverId: myId, createdAt: { lt: delayThreshold }, isRead: false }
         ]
       }
     });
 
-    res.status(200).json({ success: true, message: 'Le fil de discussion a été nettoyé avec succès.' });
+    console.log(`🧹 Nettoyage accompli : ${result.count} messages inactifs supprimés.`);
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Le fil de discussion a été nettoyé et allégé avec succès.' 
+    });
   } catch (error) {
     console.error('Erreur cleanupEmptyConversations:', error);
     res.status(500).json({ error: 'Erreur lors du nettoyage des discussions.' });
   }
 };
+
 
