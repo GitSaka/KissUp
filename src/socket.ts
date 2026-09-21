@@ -9,7 +9,9 @@ export function initSocketServer(server: HttpServer) {
     cors: {
       origin: "*",
       methods: ["GET", "POST"]
-    }
+    },
+    pingInterval: 4000, // Le serveur envoie un ping toutes les 4 secondes
+    pingTimeout: 7000,
   });
 
   io.on('connection', (socket: Socket) => {
