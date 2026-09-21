@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware.js';
 import { generateZegoToken } from '../utils/zegoToken.js';
 
+
 export const getZegoToken = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const userID = req.user?.userId;
