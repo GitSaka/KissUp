@@ -13,8 +13,17 @@ export const getNotifications = async (req: AuthenticatedRequest, res: Response)
 
     const notifications = await prisma.notification.findMany({
       where: { receiverId: myId },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            nickname: true,
+            avatar: true,
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
-      take: 40
+      take: 40,
     });
 
     res.status(200).json({ notifications });
@@ -49,5 +58,28 @@ export const markEverythingAsRead = async (req: AuthenticatedRequest, res: Respo
   } catch (error) {
     console.error('Erreur markEverythingAsRead:', error);
     res.status(500).json({ error: 'Erreur lors de la mise à jour globale.' });
+  }
+};
+
+// 🔢 Compter uniquement les notifications non lues
+export const getUnreadNotificationsCount = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const myId = req.user?.userId;
+    if (!myId) {
+      res.status(401).json({ error: 'Non authentifié' });
+      return;
+    }
+
+    const count = await prisma.notification.count({
+      where: { 
+        receiverId: myId, 
+        isRead: false 
+      },
+    });
+
+    res.status(200).json({ count });
+  } catch (error) {
+    console.error('Erreur getUnreadNotificationsCount:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 };

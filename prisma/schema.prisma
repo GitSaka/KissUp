@@ -150,6 +150,9 @@ model User {
   visitors             ProfileVisitor[]  @relation("VisitorRelation")
   visiteds             ProfileVisitor[]  @relation("VisitedRelation")
 
+  receivedNotifications Notification[] @relation("NotificationReceiver")
+  sentNotifications     Notification[] @relation("NotificationSender")
+
   // 💰 Relations financières
   transactions         Transaction[]     @relation("UserTransactions")
   targetTransactions   Transaction[]     @relation("TargetUserTransactions")
@@ -175,6 +178,10 @@ model Notification {
   actionUrl   String?          // 🚀 L'URL cliquable pour Expo Router (ex: /profile/user_id)
   isRead      Boolean          @default(false)
   createdAt   DateTime         @default(now())
+
+  // 🔗 Relations Prisma pour inclure les infos utilisateur
+  receiver    User             @relation("NotificationReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender      User?            @relation("NotificationSender", fields: [senderId], references: [id], onDelete: SetNull)
 
   @@map("notifications")
 }
