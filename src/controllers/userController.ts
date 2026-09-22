@@ -142,26 +142,50 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
       return;
     }
 
-    // 🚀 LES DEUX PREMIÈRES ÉTAPES LOGIQUES : Enregistrement et Propulsion de l'alerte !
+   // 🚀 GESTION INTELLIGENTE DE LA VISITE DU PROFIL
     if (currentUserId !== id) {
-      // 1. Sauvegarde instantanée de la visite dans ta table Prisma Notification
       const nameOfVisitor = req.user?.nickname || 'Un utilisateur';
       
-      const newNotification = await prisma.notification.create({
-        data: {
-          receiverId: id,            // Celui qui reçoit l'alerte
-          senderId: currentUserId,   // Celui qui a cliqué/visité
+      // 1. Définir une limite de temps (ex: 12 heures)
+      const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+
+      // 2. Vérifier s'il existe déjà une notification de visite récente de CETTE personne
+      const existingVisit = await prisma.notification.findFirst({
+        where: {
+          receiverId: id,          // Propriétaire du profil
+          senderId: currentUserId, // Visiteur
           type: 'VISIT',
-          title: 'Nouvelle visite ! 👀',
-          content: `${nameOfVisitor} a visité votre profil.`,
-          actionUrl: `/profile/${currentUserId}`, // Permet au Frontend Expo Router de savoir où aller au clic !
-          isRead: false,
+          createdAt: {
+            gte: twelveHoursAgo,   // Créée il y a moins de 12h
+          },
         },
       });
 
-      // 2. Émission du signal WebSockets (Optionnel : si le serveur io global est accessible ici)
-      // Si tu as un fichier d'export global pour io, tu pourras appeler :
-      // global.io.to(id).emit('incoming_notification_alert', newNotification);
+      if (existingVisit) {
+        // 3A. Si elle existe déjà : on met juste à jour sa date et on la repasse en non lue
+        await prisma.notification.update({
+          where: { id: existingVisit.id },
+          data: {
+            createdAt: new Date(), // Actualise l'heure pour la faire remonter en haut de la liste
+            isRead: false,         // Remet en non-lu pour l'alerte
+          },
+        });
+      } else {
+        // 3B. Sinon : on crée une toute nouvelle notification de visite
+        await prisma.notification.create({
+          data: {
+            receiverId: id,            
+            senderId: currentUserId,   
+            type: 'VISIT',
+            title: 'Nouvelle visite ! 👀',
+            content: `${nameOfVisitor} a visité votre profil.`,
+            actionUrl: `/profile/${currentUserId}`, 
+            isRead: false,
+          },
+        });
+      }
+
+      // (Optionnel) Émission WebSockets si configurée
     }
 
     res.status(200).json(user);
