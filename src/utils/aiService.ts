@@ -1,4 +1,4 @@
-// 🤖 Service d'Intelligence Artificielle pour les bots de KissUP (Mémoire & Prompt Corrigés)
+// 🤖 Service d'Intelligence Artificielle (Avec System Instruction natif & Mémoire)
 
 interface ChatMessage {
   senderId: string;
@@ -21,34 +21,32 @@ export const generateBotResponse = async (
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`;
 
-    // 🎭 On intègre la consigne de personnalité directement dans un format de texte initial ou des contents
-    // pour garantir que Gemini l'applique à 100% sans erreur de structure.
-    const personaInstruction = `[CONSIGNE SYSTEME] Tu es une vraie utilisatrice sur une application de rencontre. Tu t'appelles ${botName}, tu as ${botAge} ans. Bio : "${botBio}". Règles : Fais des phrases TRÈS COURTES (1 phrase max, style SMS rapide). Varie tes émojis ( 😉, 😂, 🔥, ❤️, 🥰, 👍 ou aucun). Adapte-toi à la discussion. Ne dis jamais que tu es une IA.\n\n`;
+    // 🔒 Consigne système stricte et isolée (le bot ne l'oubliera JAMAIS)
+    const systemInstructionText = `
+      Tu es une vraie utilisatrice humaine sur l'application de rencontre KissUP. 
+      Nom : ${botName}, Âge : ${botAge} ans. Bio : "${botBio}".
+      
+      RÈGLES ABSOLUES :
+      1. Écris TOUJOURS des messages ULTRA COURTS (1 phrase maximum, comme un vrai SMS rapide entre potes ou sur Tinder). Jamais de longs paragraphes.
+      2. Interdit de dire que tu es une IA, un robot ou un modèle de langage. Tu es une vraie fille.
+      3. Varie tes émojis ou n'en mets pas ( 😉, 😂, 🔥, ❤️, 🥰, 👍 ).
+      4. Réponds directement à ce qu'on te dit de façon naturelle et vivante.
+    `;
 
-    // 🧠 Transformation propre de l'historique pour l'API
-    const formattedContents: { role: string; parts: { text: string }[] }[] = [];
-
-    // Si on a de l'historique, on injecte la consigne au tout début du premier message utilisateur
-    chatHistory.forEach((msg, index) => {
+    // 🧠 Transformation propre de l'historique sans polluer les consignes
+    const formattedContents = chatHistory.map((msg) => {
       const isFromBot = msg.senderId === botId;
-      let textContent = msg.content || "";
-
-      // Si c'est le tout premier message de l'historique et qu'il vient de l'humain, on glisse la consigne
-      if (index === 0 && !isFromBot) {
-        textContent = personaInstruction + textContent;
-      }
-
-      formattedContents.push({
+      return {
         role: isFromBot ? "model" : "user",
-        parts: [{ text: textContent }]
-      });
+        parts: [{ text: msg.content || "" }]
+      };
     });
 
-    // Sécurité au cas où l'historique serait vide
+    // Sécurité si l'historique est vide
     if (formattedContents.length === 0) {
       formattedContents.push({
         role: "user",
-        parts: [{ text: personaInstruction + "Coucou" }]
+        parts: [{ text: "Coucou" }]
       });
     }
 
@@ -56,7 +54,15 @@ export const generateBotResponse = async (
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: formattedContents
+        // On passe les règles de manière officielle et séparée de l'historique
+        system_instruction: {
+          parts: [{ text: systemInstructionText }]
+        },
+        contents: formattedContents,
+        generationConfig: {
+          maxOutputTokens: 100, // 👈 Bloque techniquement les réponses longues (maximum ~2 phrases)
+          temperature: 0.9,     // Rend le style plus vivant et imprévisible
+        }
       })
     });
 
