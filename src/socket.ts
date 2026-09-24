@@ -2,7 +2,11 @@ import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import { prisma } from './config/prisma.js';
 
-const connectedUsers = new Map<string, string>();
+export const connectedUsers = new Map<string, string>();
+
+// 🌍 Variable globale pour exporter l'instance io partout où tu en as besoin
+let ioInstance: Server | null = null;
+export const getIO = () => ioInstance;
 
 export function initSocketServer(server: HttpServer) {
   const io = new Server(server, {
@@ -13,6 +17,7 @@ export function initSocketServer(server: HttpServer) {
     pingInterval: 4000, // Le serveur envoie un ping toutes les 4 secondes
     pingTimeout: 7000,
   });
+  ioInstance = io;
 
   io.on('connection', (socket: Socket) => {
     console.log(`🔌 Nouveau téléphone connecté au réseau : ${socket.id}`);
@@ -81,37 +86,116 @@ export function initSocketServer(server: HttpServer) {
           console.log(`📩 Message de [${data.senderName}] relayé dans le salon [${data.roomID}]`);
         });
 
-    socket.on('send_private_message', async (data: { 
-      senderId: string; 
-      receiverId: string; 
-      content: string | null; 
-      type?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'STICKER'; 
-      mediaUrl?: string; 
-      durationSeconds?: number;
-    }) => {
-      try {
-        const savedMessage = await prisma.message.create({
-          data: {
-            senderId: data.senderId,
-            receiverId: data.receiverId,
-            content: data.content,
-            type: data.type || 'TEXT',
-            mediaUrl: data.mediaUrl || null,
-            durationSeconds: data.durationSeconds || null,
-          },
-        });
+      socket.on('send_private_message', async (data: { 
+        senderId: string; 
+        receiverId: string; 
+        content: string | null; 
+        type?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'STICKER'; 
+        mediaUrl?: string; 
+        durationSeconds?: number;
+      }) => {
+        try {
+          // 1. Sauvegarde et envoi immédiat du message envoyé par l'humain
+          const savedMessage = await prisma.message.create({
+            data: {
+              senderId: data.senderId,
+              receiverId: data.receiverId,
+              content: data.content,
+              type: data.type || 'TEXT',
+              mediaUrl: data.mediaUrl || null,
+              durationSeconds: data.durationSeconds || null,
+            },
+          });
 
-        const targetSocketId = connectedUsers.get(data.receiverId);
-        if (targetSocketId) {
-          io.to(targetSocketId).emit('receive_private_message', savedMessage);
+          // Confirmation à l'envoyeur et relais si le destinataire est en ligne
+          const targetSocketId = connectedUsers.get(data.receiverId);
+          if (targetSocketId) {
+            io.to(targetSocketId).emit('receive_private_message', savedMessage);
+          }
+          socket.emit('message_sent_confirmation', savedMessage);
+
+          // 🤖 2. INTERCEPTEUR DE ROBOT IA (GOOGLE GEMINI & GALERIE PRISMA)
+          const recipient = await prisma.user.findUnique({
+            where: { id: data.receiverId },
+            select: { isBot: true, nickname: true, age: true, bio: true }
+          });
+
+          if (recipient && recipient.isBot && data.type === 'TEXT' && data.content) {
+            // On simule un petit indicateur d'écriture pour faire humain (1.5 seconde)
+            socket.emit('user_typing', { userId: data.receiverId });
+
+            setTimeout(async () => {
+              try {
+                let botSavedMessage;
+                
+                // 🎲 TIRAGE AU SORT : 20% de chance que le bot envoie une vraie photo de sa galerie Prisma
+                const randomChance = Math.random();
+                
+                if (randomChance < 0.20) {
+                  // Cherche les photos de ce bot dans la base Neon
+                  const botPhotos = await prisma.userPhoto.findMany({
+                    where: { userId: data.receiverId },
+                    take: 5
+                  });
+
+                  if (botPhotos.length > 0) {
+                    // Choisit une photo au hasard parmi les siennes
+                    const randomPhoto = botPhotos[Math.floor(Math.random() * botPhotos.length)];
+                    
+                    botSavedMessage = await prisma.message.create({
+                      data: {
+                        senderId: data.receiverId,
+                        receiverId: data.senderId,
+                        content: "Regarde cette photo de moi ! 🥰",
+                        type: 'IMAGE',
+                        mediaUrl: randomPhoto.imageUrl // 👈 On utilise l'URL de sa vraie table UserPhoto
+                      },
+                    });
+                    
+                    console.log(`📸 [BOT MEDIA] ${recipient.nickname} a envoyé une de ses photos.`);
+                  }
+                }
+
+                // Si le tirage n'a pas donné de photo (ou s'il n'en a pas), on utilise Gemini pour le texte
+                if (!botSavedMessage) {
+                  const { generateBotResponse } = await import('./utils/aiService.js');
+                  
+                  const aiReplyText = await generateBotResponse(
+                    recipient.nickname,
+                    recipient.age || 22,
+                    recipient.bio || "Chaleureuse et souriante",
+                    data.content || ""
+                  );
+
+                  botSavedMessage = await prisma.message.create({
+                    data: {
+                      senderId: data.receiverId, // Le Bot devient l'expéditeur
+                      receiverId: data.senderId, // L'humain devient le destinataire
+                      content: aiReplyText,
+                      type: 'TEXT',
+                    },
+                  });
+
+                  console.log(`🤖 [BOT AI] ${recipient.nickname} a répondu : "${aiReplyText}"`);
+                }
+
+                // On éteint l'indicateur d'écriture et on propulse le message sur le téléphone
+                socket.emit('user_stopped_typing', { userId: data.receiverId });
+                socket.emit('receive_private_message', botSavedMessage);
+
+              } catch (err) {
+                console.error("Erreur lors de la réponse du bot (Média ou IA):", err);
+                socket.emit('user_stopped_typing', { userId: data.receiverId });
+              }
+            }, 1500);
+          }
+
+        } catch (error) {
+          console.error('Erreur lors de la sauvegarde du message privé ou traitement IA:', error);
+          socket.emit('message_error', { message: "Erreur lors de l'envoi du message." });
         }
+      });
 
-        socket.emit('message_sent_confirmation', savedMessage);
-      } catch (error) {
-        console.error('Erreur lors de la sauvegarde du message privé:', error);
-        socket.emit('message_error', { message: "Erreur lors de l'envoi du message." });
-      }
-    });
 
     // ✅ ACCUSÉS DE LECTURE : marque tous les messages d'une conversation comme lus
     // 👇 Bien à l'intérieur de io.on('connection', ...) maintenant, sinon "socket" n'existe pas ici

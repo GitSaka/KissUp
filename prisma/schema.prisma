@@ -153,6 +153,11 @@ model User {
   receivedNotifications Notification[] @relation("NotificationReceiver")
   sentNotifications     Notification[] @relation("NotificationSender")
 
+  // 🚀 Lignes réciproques pour le compteur anti-spam
+  botTriggersReceived BotTrigger[] @relation("BoyTriggers")
+  botActionsSent      BotTrigger[] @relation("BotActions")
+
+
   // 💰 Relations financières
   transactions         Transaction[]     @relation("UserTransactions")
   targetTransactions   Transaction[]     @relation("TargetUserTransactions")
@@ -228,6 +233,25 @@ model UserInteraction {
   @@unique([senderId, receiverId])
   @@map("user_interactions")
 }
+
+// ==================== COMPTEUR STRATÉGIQUE ANTI-SPAM ====================
+
+// ==================== COMPTEUR STRATÉGIQUE ANTI-SPAM ====================
+
+model BotTrigger {
+  id         String   @id @default(uuid())
+  userId     String   // L'ID du vrai garçon qui reçoit l'hameçon
+  botId      String   // L'ID du robot femme qui a pris l'initiative d'écrire
+  createdAt  DateTime @default(now())
+
+  // 🔗 Relations explicites vers la table "users"
+  user       User     @relation("BoyTriggers", fields: [userId], references: [id], onDelete: Cascade)
+  bot        User     @relation("BotActions", fields: [botId], references: [id], onDelete: Cascade)
+
+  @@map("bot_triggers")
+}
+
+
 
 model Message {
   id              String      @id @default(uuid())

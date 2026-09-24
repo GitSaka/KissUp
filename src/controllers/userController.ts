@@ -9,19 +9,36 @@ export const getHomeUsers = async (req: AuthenticatedRequest, res: Response): Pr
     const { category } = req.query; // 'Recommandés', 'Nouveaux', 'En vedette'
     const currentUserId = req.user?.userId;
 
+    // 🚀 FONCTION MIROIR CHIRURGICALE : Définir le filtre par défaut
     let whereClause: any = {
-      // On exclut l'utilisateur connecté pour qu'il ne se voie pas lui-même
       ...(currentUserId && { NOT: { id: currentUserId } }),
     };
+
+    // Si un utilisateur est authentifié, on adapte l'accueil selon son profil
+    if (currentUserId) {
+      const currentUser = await prisma.user.findUnique({
+        where: { id: currentUserId },
+        select: { gender: true }
+      });
+
+      if (currentUser) {
+        // 🎯 RÈGLE METIER COEUR : Si c'est un Homme (MALE), il ne voit QUE des Femmes (FEMALE), et inversement !
+        const inverseGender = currentUser.gender === 'MALE' ? 'FEMALE' : 'MALE';
+        
+        whereClause = {
+          NOT: { id: currentUserId },
+          gender: inverseGender // ⚡️ Seuls les profils du sexe opposé (vrais + robots) s'affichent !
+        };
+      }
+    }
+
     let orderBy: any = {};
 
     // ⚡️ Logique dynamique selon l'onglet sélectionné sur l'application mobile
     if (category === 'Nouveaux') {
-      // Les plus récents inscrits en premier (basé sur le champ createdAt de ton modèle)
       orderBy = { createdAt: 'desc' };
     } 
     else if (category === 'En vedette') {
-      // Les profils populaires : d'abord les VIP, puis ceux qui ont le plus de charme et de richesse
       orderBy = [
         { isVip: 'desc' },
         { charmLevel: 'desc' },
@@ -40,7 +57,7 @@ export const getHomeUsers = async (req: AuthenticatedRequest, res: Response): Pr
     const users = await prisma.user.findMany({
       where: whereClause,
       orderBy: orderBy,
-      take: 30, // Limite raisonnable pour la performance de la page d'accueil
+      take: 30,
       select: {
         id: true,
         nickname: true,
@@ -57,7 +74,6 @@ export const getHomeUsers = async (req: AuthenticatedRequest, res: Response): Pr
         wealthLevel: true,
         isVip: true,
         createdAt: true,
-        // 🔍 On vérifie si l'utilisateur connecté a déjà liké ce profil
         followers: {
           where: { followerId: currentUserId || '' },
         },
@@ -80,6 +96,7 @@ export const getHomeUsers = async (req: AuthenticatedRequest, res: Response): Pr
     res.status(500).json({ error: 'Erreur lors de la récupération des profils' });
   }
 };
+
 export const getUserProfileById = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const currentUserId = req.user?.userId; // Celui qui clique pour regarder
