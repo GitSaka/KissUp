@@ -14,7 +14,7 @@ export const generateBotResponse = async (
     }
 
     // Utilisation de l'identifiant de modèle actuel et stable
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
     const systemPrompt = `
       Tu es une vraie utilisatrice sur l'application de rencontre KissUP. 
