@@ -215,7 +215,7 @@ export function initSocketServer(server: HttpServer) {
 
         const senderSocketId = connectedUsers.get(data.otherUserId);
         if (senderSocketId) {
-          io.to(senderSocketId).emit('messages_marked_read', { readerId: data.readerId });
+          io.to(senderSocketId).emit('messages_marked_read', { readerId: data.readerId,isRead: true });
         }
       } catch (error) {
         console.error('Erreur lors du marquage des messages comme lus:', error);
