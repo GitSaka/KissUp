@@ -1,4 +1,4 @@
-// 🤖 Service d'Intelligence Artificielle pour les bots de KissUP (Avec mémoire & prompt optimisé)
+// 🤖 Service d'Intelligence Artificielle pour les bots de KissUP (Mémoire & Prompt Corrigés)
 
 interface ChatMessage {
   senderId: string;
@@ -21,35 +21,41 @@ export const generateBotResponse = async (
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`;
 
-    // 🎭 Prompt ultra-renforcé pour un comportement 100% humain et varié
-    const systemInstruction = `
-      Tu es une vraie utilisatrice sur l'application de rencontre KissUP. 
-      Tu t'appelles ${botName}, tu as ${botAge} ans. Voici ta biographie : "${botBio}".
-      
-      Règles strictes de comportement :
-      1. Réponds TOUJOURS de façon ultra-courte (1 phrase maximum, comme un vrai SMS rapide de chat).
-      2. Adapte ta réponse précisément à ce qu'on vient de te dire ou de te demander. Pas de phrases passe-partout.
-      3. VARIE tes émojis ! Interdit de mettre toujours le même (utilise au choix : 😉, 😂, 🔥, ❤️, 🥰, 👍, hmmm, ou même aucun émoji de temps en temps).
-      4. N'utilise JAMAIS systématiquement le même mot ou le même symbole à la fin de tes messages. Sois imprévisible et naturelle.
-      5. Ne mentionne JAMAIS que tu es une intelligence artificielle ou un robot.
-    `;
+    // 🎭 On intègre la consigne de personnalité directement dans un format de texte initial ou des contents
+    // pour garantir que Gemini l'applique à 100% sans erreur de structure.
+    const personaInstruction = `[CONSIGNE SYSTEME] Tu es une vraie utilisatrice sur une application de rencontre. Tu t'appelles ${botName}, tu as ${botAge} ans. Bio : "${botBio}". Règles : Fais des phrases TRÈS COURTES (1 phrase max, style SMS rapide). Varie tes émojis ( 😉, 😂, 🔥, ❤️, 🥰, 👍 ou aucun). Adapte-toi à la discussion. Ne dis jamais que tu es une IA.\n\n`;
 
-    // 🧠 On formate l'historique pour que Gemini ait toute la conversation en mémoire
-    const formattedContents = chatHistory.map((msg) => {
+    // 🧠 Transformation propre de l'historique pour l'API
+    const formattedContents: { role: string; parts: { text: string }[] }[] = [];
+
+    // Si on a de l'historique, on injecte la consigne au tout début du premier message utilisateur
+    chatHistory.forEach((msg, index) => {
       const isFromBot = msg.senderId === botId;
-      return {
+      let textContent = msg.content || "";
+
+      // Si c'est le tout premier message de l'historique et qu'il vient de l'humain, on glisse la consigne
+      if (index === 0 && !isFromBot) {
+        textContent = personaInstruction + textContent;
+      }
+
+      formattedContents.push({
         role: isFromBot ? "model" : "user",
-        parts: [{ text: msg.content || "" }]
-      };
+        parts: [{ text: textContent }]
+      });
     });
+
+    // Sécurité au cas où l'historique serait vide
+    if (formattedContents.length === 0) {
+      formattedContents.push({
+        role: "user",
+        parts: [{ text: personaInstruction + "Coucou" }]
+      });
+    }
 
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: systemInstruction }]
-        },
         contents: formattedContents
       })
     });
