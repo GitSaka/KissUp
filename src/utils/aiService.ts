@@ -1,4 +1,4 @@
-// 🤖 Service d'Intelligence Artificielle (Gemini 2.5 Flash) pour les bots de KissUP
+// 🤖 Service d'Intelligence Artificielle pour les bots de KissUP
 
 export const generateBotResponse = async (
   botName: string, 
@@ -10,25 +10,25 @@ export const generateBotResponse = async (
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       console.warn("[IA Backend] Clé API GEMINI_API_KEY manquante dans le .env.");
-      return "Coucou ! 😊"; // Réponse de secours par défaut
+      return "Coucou ! 😊";
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    // Utilisation de l'identifiant de modèle actuel et stable
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
 
-    // 🎭 Le prompt de séduction contextuel
     const systemPrompt = `
       Tu es une vraie utilisatrice sur l'application de rencontre KissUP. 
-      Tu t'appelles ${botName}, tu as ${botAge} ans. Voici ta biographie : "${botBio}".
+      T'appelles ${botName}, tu as ${botAge} ans. Bio : "${botBio}".
       
-      Instructions strictes de comportement :
-      1. Réponds au message de l'utilisateur de manière amicale, chaleureuse et naturelle.
-      2. Fais des phrases TRÈS COURTES (maximum 1 ou 2 phrases), comme quelqu'un qui écrit rapidement par SMS sur son téléphone.
-      3. Utilise quelques émojis de façon naturelle (ex: 😊, 😉, ✨). Ne sois pas un robot d'entreprise.
-      4. Reste mystérieuse ou pose une question courte pour relancer la discussion et donner envie au garçon de te répondre.
-      5. Ne mentionne JAMAIS que tu es une intelligence artificielle ou un robot.
+      Règles strictes :
+      1. Réponds au message de l'utilisateur de façon naturelle, vivante et branchée.
+      2. Fais des phrases TRÈS COURTES (1 ou 2 phrases max, style SMS rapide).
+      3. Utilise des émojis naturels (ex: 😉, 🔥, ✨, 😂). Interdit de faire du copier-coller robotique.
+      4. Pose une petite question ou relance subtilement pour pousser à la discussion.
+      5. Ne dis JAMAIS que tu es une IA ou un robot.
       
-      Message du garçon : "${userMessage}"
-      Ta réponse courte :
+      Message reçu : "${userMessage}"
+      Réponds directement :
     `;
 
     const response = await fetch(url, {
@@ -42,20 +42,19 @@ export const generateBotResponse = async (
     const json = await response.json() as any;
     
     if (!response.ok) {
-      console.error("Erreur API Gemini Backend :", json);
-      return "Dis-moi en plus ? 😉";
+      console.error("Erreur API Gemini Backend :", JSON.stringify(json, null, 2));
+      return "Ah ouais ? Raconte-moi un peu plus 😊";
     }
 
-    // Extraction sécurisée du texte généré par Gemini
     const textResult = json.candidates?.[0]?.content?.parts?.[0]?.text;
     
     if (textResult) {
       return textResult.trim();
     }
-    return "Coucou ! 😊";
+    return "Tu fais quoi de beau en ce moment ? ✨";
 
   } catch (error: any) {
     console.error("Erreur de connexion avec Gemini au Backend :", error.message);
-    return "Tu vas bien ? ✨";
+    return "Haha grave ! Dis-moi tout 😉";
   }
 };

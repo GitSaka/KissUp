@@ -114,80 +114,57 @@ export function initSocketServer(server: HttpServer) {
           }
           socket.emit('message_sent_confirmation', savedMessage);
 
-          // 🤖 2. INTERCEPTEUR DE ROBOT IA (GOOGLE GEMINI & GALERIE PRISMA)
+          // 🤖 2. INTERCEPTEUR DE ROBOT IA FLUIDE ET SYNCHRONISÉ (ZÉRO PHOTO)
           const recipient = await prisma.user.findUnique({
             where: { id: data.receiverId },
             select: { isBot: true, nickname: true, age: true, bio: true }
           });
 
           if (recipient && recipient.isBot && data.type === 'TEXT' && data.content) {
-            // On simule un petit indicateur d'écriture pour faire humain (1.5 seconde)
-            socket.emit('user_typing', { userId: data.receiverId });
+            
+            // ⏱️ Temps de réflexion initial (L'écran reste silencieux 1 à 2.5 secondes pour simuler la lecture du SMS)
+            const readingDelay = Math.floor(Math.random() * 1500) + 1000; 
 
             setTimeout(async () => {
               try {
-                let botSavedMessage;
+                // Appel unique de ton IA Gemini adaptative
+                const { generateBotResponse } = await import('./utils/aiService.js');
                 
-                // 🎲 TIRAGE AU SORT : 20% de chance que le bot envoie une vraie photo de sa galerie Prisma
-                const randomChance = Math.random();
-                
-                if (randomChance < 0.20) {
-                  // Cherche les photos de ce bot dans la base Neon
-                  const botPhotos = await prisma.userPhoto.findMany({
-                    where: { userId: data.receiverId },
-                    take: 5
-                  });
+                const aiReplyText = await generateBotResponse(
+                  recipient.nickname,
+                  recipient.age || 22,
+                  recipient.bio || "Chaleureuse et souriante",
+                  data.content || ""
+                );
 
-                  if (botPhotos.length > 0) {
-                    // Choisit une photo au hasard parmi les siennes
-                    const randomPhoto = botPhotos[Math.floor(Math.random() * botPhotos.length)];
-                    
-                    botSavedMessage = await prisma.message.create({
-                      data: {
-                        senderId: data.receiverId,
-                        receiverId: data.senderId,
-                        content: "Regarde cette photo de moi ! 🥰",
-                        type: 'IMAGE',
-                        mediaUrl: randomPhoto.imageUrl // 👈 On utilise l'URL de sa vraie table UserPhoto
-                      },
-                    });
-                    
-                    console.log(`📸 [BOT MEDIA] ${recipient.nickname} a envoyé une de ses photos.`);
-                  }
-                }
+                // Sauvegarde de la réponse de l'IA dans Prisma
+                const botSavedMessage = await prisma.message.create({
+                  data: {
+                    senderId: data.receiverId,
+                    receiverId: data.senderId,
+                    content: aiReplyText,
+                    type: 'TEXT',
+                  },
+                });
 
-                // Si le tirage n'a pas donné de photo (ou s'il n'en a pas), on utilise Gemini pour le texte
-                if (!botSavedMessage) {
-                  const { generateBotResponse } = await import('./utils/aiService.js');
-                  
-                  const aiReplyText = await generateBotResponse(
-                    recipient.nickname,
-                    recipient.age || 22,
-                    recipient.bio || "Chaleureuse et souriante",
-                    data.content || ""
-                  );
+                // 📊 TYPING DYNAMIQUE : Plus la phrase de l'IA est longue, plus elle met du temps à taper !
+                const typingDuration = Math.max(1500, Math.min(4500, aiReplyText.length * 65));
 
-                  botSavedMessage = await prisma.message.create({
-                    data: {
-                      senderId: data.receiverId, // Le Bot devient l'expéditeur
-                      receiverId: data.senderId, // L'humain devient le destinataire
-                      content: aiReplyText,
-                      type: 'TEXT',
-                    },
-                  });
+                // On allume l'indicateur "En train d'écrire..." uniquement APRÈS le délai de lecture !
+                io.to(socket.id).emit('user_typing', { userId: data.receiverId });
 
-                  console.log(`🤖 [BOT AI] ${recipient.nickname} a répondu : "${aiReplyText}"`);
-                }
-
-                // On éteint l'indicateur d'écriture et on propulse le message sur le téléphone
-                socket.emit('user_stopped_typing', { userId: data.receiverId });
-                socket.emit('receive_private_message', botSavedMessage);
+                // On attend la fin de l'écriture simulée pour distribuer la réponse
+                setTimeout(() => {
+                  io.to(socket.id).emit('user_stopped_typing', { userId: data.receiverId });
+                  io.to(socket.id).emit('receive_private_message', botSavedMessage);
+                  console.log(`🤖 [BOT AI LIVE] ${recipient.nickname} a répondu : "${aiReplyText}"`);
+                }, typingDuration);
 
               } catch (err) {
-                console.error("Erreur lors de la réponse du bot (Média ou IA):", err);
-                socket.emit('user_stopped_typing', { userId: data.receiverId });
+                console.error("Erreur lors de la génération de la réponse du bot:", err);
+                io.to(socket.id).emit('user_stopped_typing', { userId: data.receiverId });
               }
-            }, 1500);
+            }, readingDelay);
           }
 
         } catch (error) {
@@ -195,6 +172,7 @@ export function initSocketServer(server: HttpServer) {
           socket.emit('message_error', { message: "Erreur lors de l'envoi du message." });
         }
       });
+
 
 
     // ✅ ACCUSÉS DE LECTURE : marque tous les messages d'une conversation comme lus
