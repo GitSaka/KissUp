@@ -86,99 +86,118 @@ export function initSocketServer(server: HttpServer) {
           console.log(`📩 Message de [${data.senderName}] relayé dans le salon [${data.roomID}]`);
         });
 
-      socket.on('send_private_message', async (data: { 
-  senderId: string; 
-  receiverId: string; 
-  content: string | null; 
-  type?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'STICKER'; 
-  mediaUrl?: string; 
-  durationSeconds?: number;
-}) => {
-  try {
-    // 1. Sauvegarde et envoi immédiat du message envoyé par l'humain
-    const savedMessage = await prisma.message.create({
-      data: {
-        senderId: data.senderId,
-        receiverId: data.receiverId,
-        content: data.content,
-        type: data.type || 'TEXT',
-        mediaUrl: data.mediaUrl || null,
-        durationSeconds: data.durationSeconds || null,
-      },
-    });
+   socket.on('send_private_message', async (data: { 
+      senderId: string; 
+      receiverId: string; 
+      content: string | null; 
+      type?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'STICKER'; 
+      mediaUrl?: string; 
+      durationSeconds?: number;
+    }) => {
+      try {
+        // 1. Sauvegarde et envoi immédiat du message envoyé par l'humain
+        const savedMessage = await prisma.message.create({
+          data: {
+            senderId: data.senderId,
+            receiverId: data.receiverId,
+            content: data.content,
+            type: data.type || 'TEXT',
+            mediaUrl: data.mediaUrl || null,
+            durationSeconds: data.durationSeconds || null,
+            isRead: false, // Initialement non lu
+          },
+        });
 
-    // Confirmation à l'envoyeur et relais si le destinataire est en ligne
-    const targetSocketId = connectedUsers.get(data.receiverId);
-    if (targetSocketId) {
-      io.to(targetSocketId).emit('receive_private_message', savedMessage);
-    }
-    socket.emit('message_sent_confirmation', savedMessage);
-
-    // 🤖 2. INTERCEPTEUR DE ROBOT IA (AVEC MÉMOIRE DES 8 DERNIERS MESSAGES)
-    const recipient = await prisma.user.findUnique({
-      where: { id: data.receiverId },
-      select: { id: true, isBot: true, nickname: true, age: true, bio: true }
-    });
-
-    if (recipient && recipient.isBot && data.type === 'TEXT' && data.content) {
-      // On simule un petit indicateur d'écriture pour faire humain (1.5 seconde)
-      socket.emit('user_typing', { userId: data.receiverId });
-
-      setTimeout(async () => {
-        try {
-          // 🧠 ÉTAPE CLÉ : Récupérer les 8 derniers messages de la conversation dans Prisma
-          const rawHistory = await prisma.message.findMany({
-            where: {
-              OR: [
-                { senderId: data.senderId, receiverId: data.receiverId },
-                { senderId: data.receiverId, receiverId: data.senderId }
-              ]
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 8 // On prend les 8 derniers échanges
-          });
-
-          // Prisma les renvoie du plus récent au plus ancien, on les remet dans l'ordre chronologique
-          rawHistory.reverse();
-
-          const { generateBotResponse } = await import('./utils/aiService.js');
-          
-          // On appelle l'IA en lui passant l'historique complet
-          const aiReplyText = await generateBotResponse(
-            recipient.nickname,
-            recipient.age || 22,
-            recipient.bio || "Chaleureuse et souriante",
-            recipient.id,
-            rawHistory // 👈 La mémoire est transmise ici !
-          );
-
-          const botSavedMessage = await prisma.message.create({
-            data: {
-              senderId: data.receiverId, // Le Bot devient l'expéditeur
-              receiverId: data.senderId, // L'humain devient le destinataire
-              content: aiReplyText,
-              type: 'TEXT',
-            },
-          });
-
-          console.log(`🤖 [BOT AI avec mémoire] ${recipient.nickname} a répondu : "${aiReplyText}"`);
-
-          // On éteint l'indicateur d'écriture et on propulse le message sur le téléphone
-          socket.emit('user_stopped_typing', { userId: data.receiverId });
-          socket.emit('receive_private_message', botSavedMessage);
-
-        } catch (err) {
-          console.error("Erreur lors de la réponse du bot IA avec mémoire:", err);
-          socket.emit('user_stopped_typing', { userId: data.receiverId });
+        // Confirmation à l'envoyeur et relais si le destinataire est en ligne
+        const targetSocketId = connectedUsers.get(data.receiverId);
+        if (targetSocketId) {
+          io.to(targetSocketId).emit('receive_private_message', savedMessage);
         }
-      }, 1500);
-    }
+        socket.emit('message_sent_confirmation', savedMessage);
 
-  } catch (error) {
-    console.error('Erreur lors de la sauvegarde du message privé ou traitement IA:', error);
-    socket.emit('message_error', { message: "Erreur lors de l'envoi du message." });
-  }
-});
+        // 🤖 2. INTERCEPTEUR DE ROBOT IA (COMPORTEMENT HUMAIN & ALÉATOIRE)
+        const recipient = await prisma.user.findUnique({
+          where: { id: data.receiverId },
+          select: { id: true, isBot: true, nickname: true, age: true, bio: true }
+        });
+
+        if (recipient && recipient.isBot && data.type === 'TEXT' && data.content) {
+          
+          // 🎲 Délai aléatoire entre 4 et 14 secondes pour simuler un vrai humain imprévisible
+          const humanDelay = Math.floor(Math.random() * (14000 - 4000 + 1)) + 4000;
+
+          setTimeout(async () => {
+            try {
+              // A) Le bot "lit" le message (passe les deux traits à l'état lu en BDD)
+              await prisma.message.update({
+                where: { id: savedMessage.id },
+                data: { isRead: true }
+              });
+
+              // On prévient le front-end que le message a été lu (pour basculer les traits)
+              socket.emit('message_read_receipt', { 
+                messageId: savedMessage.id, 
+                status: 'READ' 
+              });
+
+              // B) Le bot commence à "écrire"
+              socket.emit('user_typing', { userId: data.receiverId });
+
+              // C) Récupération de l'historique (les 8 derniers messages)
+              const rawHistory = await prisma.message.findMany({
+                where: {
+                  OR: [
+                    { senderId: data.senderId, receiverId: data.receiverId },
+                    { senderId: data.receiverId, receiverId: data.senderId }
+                  ]
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 8
+              });
+
+              rawHistory.reverse();
+
+              const { generateBotResponse } = await import('./utils/aiService.js');
+              
+              // Appel de l'IA avec la mémoire
+              const aiReplyText = await generateBotResponse(
+                recipient.nickname,
+                recipient.age || 22,
+                recipient.bio || "Chaleureuse et souriante",
+                recipient.id,
+                rawHistory
+              );
+
+              const botSavedMessage = await prisma.message.create({
+                data: {
+                  senderId: data.receiverId,
+                  receiverId: data.senderId,
+                  content: aiReplyText,
+                  type: 'TEXT',
+                  isRead: false,
+                },
+              });
+
+              console.log(`🤖 [BOT Humain] ${recipient.nickname} a répondu après ${Math.round(humanDelay / 1000)}s : "${aiReplyText}"`);
+
+              // D) Petite pause de 2 secondes de "typing visible" avant d'envoyer le texte final
+              setTimeout(() => {
+                socket.emit('user_stopped_typing', { userId: data.receiverId });
+                socket.emit('receive_private_message', botSavedMessage);
+              }, 2000);
+
+            } catch (err) {
+              console.error("Erreur lors de la réponse du bot IA:", err);
+              socket.emit('user_stopped_typing', { userId: data.receiverId });
+            }
+          }, humanDelay);
+        }
+
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde du message privé ou traitement IA:', error);
+        socket.emit('message_error', { message: "Erreur lors de l'envoi du message." });
+      }
+    });
 
 
     // ✅ ACCUSÉS DE LECTURE : marque tous les messages d'une conversation comme lus
