@@ -116,26 +116,31 @@ export function initSocketServer(server: HttpServer) {
           socket.emit('message_sent_confirmation', savedMessage);
 
           // 🤖 2. INTERCEPTEUR DE ROBOT IA (COMPORTEMENT HUMAIN & ALÉATOIRE)
-          const recipient = await prisma.user.findUnique({
-            where: { id: data.receiverId },
-            select: { id: true, isBot: true, nickname: true, age: true, bio: true }
-          });
-
-          if (recipient && recipient.isBot && data.type === 'TEXT' && data.content) {
+            const recipient = await prisma.user.findUnique({
+              where: { id: data.receiverId },
+              select: { id: true, isBot: true, nickname: true, age: true, bio: true }
+            });
+      if (recipient && recipient.isBot && data.type === 'TEXT' && data.content) {
             
             // 🎲 Délai aléatoire entre 4 et 14 secondes pour simuler un vrai humain imprévisible
             const humanDelay = Math.floor(Math.random() * (14000 - 4000 + 1)) + 4000;
 
             setTimeout(async () => {
               try {
-                // A) Le bot "lit" le message en base de données
+                // A) Le bot "ouvre" l'application : il passe en ligne (Point vert 🟢)
+                await prisma.user.update({
+                  where: { id: data.receiverId },
+                  data: { isOnline: true }
+                });
+                io.emit('user_status_changed', { userId: data.receiverId, isOnline: true });
+
+                // B) Le bot "lit" le message (passe les deux traits à l'état lu en BDD)
                 await prisma.message.update({
                   where: { id: savedMessage.id },
                   data: { isRead: true }
                 });
 
-                // B) On prévient ton application front-end que le message est lu (passe instantanément à 2 traits)
-                // On utilise l'événement 'messages_marked_read' que ton front-end écoute déjà
+                // On prévient ton application front-end que le message est lu (2 traits)
                 socket.emit('messages_marked_read', { 
                   readerId: data.receiverId, 
                   isRead: true 
@@ -156,43 +161,50 @@ export function initSocketServer(server: HttpServer) {
                   take: 8
                 });
 
-          rawHistory.reverse();
+                rawHistory.reverse();
 
-          const { generateBotResponse } = await import('./utils/aiService.js');
-          
-          // Appel de l'IA avec la mémoire
-          const aiReplyText = await generateBotResponse(
-            recipient.nickname,
-            recipient.age || 22,
-            recipient.bio || "Chaleureuse et souriante",
-            recipient.id,
-            rawHistory
-          );
+                const { generateBotResponse } = await import('./utils/aiService.js');
+                
+                // Appel de l'IA avec la mémoire
+                const aiReplyText = await generateBotResponse(
+                  recipient.nickname,
+                  recipient.age || 22,
+                  recipient.bio || "Chaleureuse et souriante",
+                  recipient.id,
+                  rawHistory
+                );
 
-          const botSavedMessage = await prisma.message.create({
-            data: {
-              senderId: data.receiverId,
-              receiverId: data.senderId,
-              content: aiReplyText,
-              type: 'TEXT',
-              isRead: false,
-            },
-          });
+                const botSavedMessage = await prisma.message.create({
+                  data: {
+                    senderId: data.receiverId,
+                    receiverId: data.senderId,
+                    content: aiReplyText,
+                    type: 'TEXT',
+                    isRead: false,
+                  },
+                });
 
-          console.log(`🤖 [BOT Humain] ${recipient.nickname} a répondu après ${Math.round(humanDelay / 1000)}s : "${aiReplyText}"`);
+                console.log(`🤖 [BOT Humain] ${recipient.nickname} a répondu après ${Math.round(humanDelay / 1000)}s : "${aiReplyText}"`);
 
-          // E) Petite pause de 2 secondes de "typing visible" avant d'envoyer le texte final
-          setTimeout(() => {
-            socket.emit('user_stopped_typing', { userId: data.receiverId });
-            socket.emit('receive_private_message', botSavedMessage);
-          }, 2000);
+                // E) Fin du "typing", envoi du message, et le bot se remet hors-ligne (ou "Vu à...")
+                setTimeout(async () => {
+                  socket.emit('user_stopped_typing', { userId: data.receiverId });
+                  socket.emit('receive_private_message', botSavedMessage);
 
-        } catch (err) {
-          console.error("Erreur lors de la réponse du bot IA:", err);
-          socket.emit('user_stopped_typing', { userId: data.receiverId });
-        }
-      }, humanDelay);
-    }
+                  // Le bot ferme l'application après avoir répondu
+                  await prisma.user.update({
+                    where: { id: data.receiverId },
+                    data: { isOnline: false, lastSeen: new Date() }
+                  });
+                  io.emit('user_status_changed', { userId: data.receiverId, isOnline: false });
+                }, 2000);
+
+              } catch (err) {
+                console.error("Erreur lors de la réponse du bot IA:", err);
+                socket.emit('user_stopped_typing', { userId: data.receiverId });
+              }
+            }, humanDelay);
+          }
 
   } catch (error) {
     console.error('Erreur lors de la sauvegarde du message privé ou traitement IA:', error);
