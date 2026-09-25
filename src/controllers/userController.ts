@@ -116,7 +116,6 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
         gender: true,
         interestedIn: true,
         coins: true,
-        
         diamonds: true,
         distance: true,
         isOnline: true,
@@ -139,13 +138,13 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
         charmLevel: true,
         activeCall: true,   
         isVerified: true,
+        isBot: true, // ⚡️ Ajouté pour s'assurer d'avoir l'information du bot dans l'objet user récupéré
         
         // 🔍 C'est ICI qu'on vérifie si le visiteur s'abonne à ce profil
         followers: {
           where: { followerId: currentUserId },
           select: { followerId: true }
         },
-
 
         photos: {
           select: {
@@ -169,8 +168,8 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
       return;
     }
 
-   // 🚀 GESTION INTELLIGENTE DE LA VISITE DU PROFIL
-    if (currentUserId !== id) {
+    // 🚀 GESTION INTELLIGENTE DE LA VISITE DU PROFIL (Uniquement si ce n'est pas un bot et que ce n'est pas son propre profil)
+    if (currentUserId !== id && !user.isBot) {
       const nameOfVisitor = req.user?.nickname || 'Un utilisateur';
       
       // 1. Définir une limite de temps (ex: 12 heures)
@@ -179,11 +178,11 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
       // 2. Vérifier s'il existe déjà une notification de visite récente de CETTE personne
       const existingVisit = await prisma.notification.findFirst({
         where: {
-          receiverId: id,          // Propriétaire du profil
-          senderId: currentUserId, // Visiteur
+          receiverId: id,           // Propriétaire du profil
+          senderId: currentUserId,  // Visiteur
           type: 'VISIT',
           createdAt: {
-            gte: twelveHoursAgo,   // Créée il y a moins de 12h
+            gte: twelveHoursAgo,    // Créée il y a moins de 12h
           },
         },
       });
@@ -218,7 +217,7 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
     // On vérifie si le tableau followers contient quelqu'un
     const isFollowing = user.followers && user.followers.length > 0;
 
-    // On retire le tableau brut et on ajoute le booléen
+    // On retire le tableau followers brut (et éventuellement isBot si tu ne veux pas l'exposer au front, ou laisse-le si besoin) et on ajoute le booléen
     const { followers, ...safeUser } = user;
     const finalUserData = {
       ...safeUser,
