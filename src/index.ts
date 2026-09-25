@@ -13,7 +13,6 @@ import giftNotifications from './routes/notificationRoutes.js';
 import { prisma } from './config/prisma.js';
 import { createServer } from 'http';
 import { initSocketServer } from './socket.js';
-import { initBotRelanceCron } from './cron/botRelanceCron.js';
 
 
 dotenv.config();
@@ -35,10 +34,6 @@ app.use('/api/moments', momentRoutes); // 👈 nouveau
 app.use('/api/gifts', giftRoutes); // 👈 nouveau
 app.use('/api/notification', giftNotifications); // 👈 nouveau
 
-
-
-
-
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Serveur SUGO prêt !' });
 });
@@ -50,14 +45,10 @@ setInterval(async () => {
   } catch (err) {
     console.log("⚠️ Neon Keep-Alive : Échec du ping.");
   }
-
 }, 120000);
 
 // 🔌 Active Socket.io sur le même serveur HTTP
 const io = initSocketServer(httpServer);
-
-// ... après la création de ton serveur HTTP et du Socket.io
-initBotRelanceCron();
 
 // ⚠️ IMPORTANT : on écoute maintenant via httpServer, plus via app directement
 httpServer.listen(Number(PORT), () => {
