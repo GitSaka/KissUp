@@ -368,7 +368,7 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response): P
 //delete photo
 export const deleteUserPhoto = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
     const rawPhotoId = req.params.photoId;
     const photoId = Array.isArray(rawPhotoId) ? rawPhotoId[0] : rawPhotoId;
 
