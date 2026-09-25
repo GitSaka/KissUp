@@ -115,12 +115,13 @@ export function initSocketServer(server: HttpServer) {
           }
           socket.emit('message_sent_confirmation', savedMessage);
 
-          // 🤖 2. INTERCEPTEUR DE ROBOT IA (COMPORTEMENT HUMAIN & ALÉATOIRE)
-            const recipient = await prisma.user.findUnique({
-              where: { id: data.receiverId },
-              select: { id: true, isBot: true, nickname: true, age: true, bio: true }
-            });
-      if (recipient && recipient.isBot && data.type === 'TEXT' && data.content) {
+          // 🤖 2. INTERCEPTEUR DE ROBOT IA (Gère TEXTE et AUDIO pour ne jamais rester muet)
+          const recipient = await prisma.user.findUnique({
+            where: { id: data.receiverId },
+            select: { id: true, isBot: true, nickname: true, age: true, bio: true }
+          });
+          
+          if (recipient && recipient.isBot && ((data.type === 'TEXT' && data.content) || (data.type === 'AUDIO' && data.mediaUrl))) {
             
             // 🎲 Délai aléatoire entre 4 et 14 secondes pour simuler un vrai humain imprévisible
             const humanDelay = Math.floor(Math.random() * (14000 - 4000 + 1)) + 4000;
@@ -166,13 +167,18 @@ export function initSocketServer(server: HttpServer) {
                 const { generateBotResponse } = await import('./utils/aiService.js');
                 
                 // Appel de l'IA avec la mémoire
-                const aiReplyText = await generateBotResponse(
+                let aiReplyText = await generateBotResponse(
                   recipient.nickname,
                   recipient.age || 22,
                   recipient.bio || "Chaleureuse et souriante",
                   recipient.id,
                   rawHistory
                 );
+
+                // Si l'utilisateur a envoyé un audio, on personnalise la réponse du bot en attendant la V2
+                if (data.type === 'AUDIO') {
+                  aiReplyText = "J'ai bien reçu ton vocal ! 😊 Mais je ne peux pas l'écouter en entier là, tu peux m'écrire en texte ?";
+                }
 
                 const botSavedMessage = await prisma.message.create({
                   data: {
@@ -200,17 +206,17 @@ export function initSocketServer(server: HttpServer) {
                 }, 2000);
 
               } catch (err) {
-                console.error("Erreur lors de la réponse du bot IA:", err);
+                console.error("Erreur lors de la réponse du bot IA sur audio/texte:", err);
                 socket.emit('user_stopped_typing', { userId: data.receiverId });
               }
             }, humanDelay);
           }
 
-  } catch (error) {
-    console.error('Erreur lors de la sauvegarde du message privé ou traitement IA:', error);
-    socket.emit('message_error', { message: "Erreur lors de l'envoi du message." });
-          }
-        });
+        } catch (error) {
+          console.error('Erreur lors de la sauvegarde du message privé ou traitement IA:', error);
+          socket.emit('message_error', { message: "Erreur lors de l'envoi du message." });
+        }
+    });
 
 
         // ✅ ACCUSÉS DE LECTURE : marque tous les messages d'une conversation comme lus
