@@ -175,9 +175,15 @@ export function initSocketServer(server: HttpServer) {
                   rawHistory
                 );
 
-                // Si l'utilisateur a envoyé un audio, on personnalise la réponse du bot en attendant la V2
+                // Si l'utilisateur a envoyé un audio, on choisit une phrase aléatoire pour lui répondre en attendant la V2
                 if (data.type === 'AUDIO') {
-                  aiReplyText = "J'ai bien reçu ton vocal ! 😊 Mais je ne peux pas l'écouter en entier là, tu peux m'écrire en texte ?";
+                  const audioReplies = [
+                    "J'ai bien reçu ton vocal ! 😊 Mais je ne peux pas l'écouter en entier là, tu peux m'écrire en texte ?",
+                    "Oh, un petit message vocal ! Je suis dans un endroit un peu bruyant, tu peux me l'écrire s'il te plaît ? 🎧",
+                    "J'ai écouté... enfin, j'ai vu que tu m'as envoyé un vocal ! Écris-moi ça stp, j'ai hâte de te lire 😉",
+                    "Coucou ! Impossible d'écouter ton audio tout de suite, tu me le résumes en texte ? 🙈"
+                  ];
+                  aiReplyText = audioReplies[Math.floor(Math.random() * audioReplies.length)];
                 }
 
                 const botSavedMessage = await prisma.message.create({

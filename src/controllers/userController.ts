@@ -112,6 +112,7 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
       select: {
         id: true,
         nickname: true,
+        tag: true, // 👈 AJOUTÉ (Important pour afficher le @tag)
         avatar: true,
         gender: true,
         interestedIn: true,
@@ -137,7 +138,8 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
         wealthLevel: true,
         charmLevel: true,
         activeCall: true,   
-        isVerified: true,   
+        isVerified: true,
+        friendsCount: true, // 👈 AJOUTÉ (Pour afficher le nombre d'amis dans les stats sociales)
         photos: {
           select: {
             id: true,
@@ -149,6 +151,7 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
           select: {
             followers: true,
             following: true,
+            receivedGifts: true, // 👈 AJOUTÉ (Pour alimenter giftsCount)
           }
         }
       }
@@ -159,36 +162,43 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
       return;
     }
 
-   // 🚀 GESTION INTELLIGENTE DE LA VISITE DU PROFIL
+    // Normalisation de l'objet pour correspondre parfaitement au front-end
+    const profileResponse = {
+      ...user,
+      giftsCount: user._count.receivedGifts, // On mappe _count.receivedGifts vers giftsCount
+    };
+
+    // 🚀 GESTION INTELLIGENTE DE LA VISITE DU PROFIL
     if (currentUserId !== id) {
-      const nameOfVisitor = req.user?.nickname || 'Un utilisateur';
+      // Récupérer proprement le nom du visiteur actuel
+      const visitorUser = await prisma.user.findUnique({
+        where: { id: currentUserId },
+        select: { nickname: true }
+      });
+      const nameOfVisitor = visitorUser?.nickname || 'Un utilisateur';
       
-      // 1. Définir une limite de temps (ex: 12 heures)
       const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
 
-      // 2. Vérifier s'il existe déjà une notification de visite récente de CETTE personne
       const existingVisit = await prisma.notification.findFirst({
         where: {
-          receiverId: id,          // Propriétaire du profil
-          senderId: currentUserId, // Visiteur
+          receiverId: id,          
+          senderId: currentUserId, 
           type: 'VISIT',
           createdAt: {
-            gte: twelveHoursAgo,   // Créée il y a moins de 12h
+            gte: twelveHoursAgo,   
           },
         },
       });
 
       if (existingVisit) {
-        // 3A. Si elle existe déjà : on met juste à jour sa date et on la repasse en non lue
         await prisma.notification.update({
           where: { id: existingVisit.id },
           data: {
-            createdAt: new Date(), // Actualise l'heure pour la faire remonter en haut de la liste
-            isRead: false,         // Remet en non-lu pour l'alerte
+            createdAt: new Date(), 
+            isRead: false,         
           },
         });
       } else {
-        // 3B. Sinon : on crée une toute nouvelle notification de visite
         await prisma.notification.create({
           data: {
             receiverId: id,            
@@ -201,11 +211,9 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
           },
         });
       }
-
-      // (Optionnel) Émission WebSockets si configurée
     }
 
-    res.status(200).json(user);
+    res.status(200).json(profileResponse);
   } catch (error) {
     console.error('Erreur getUserProfileById:', error);
     res.status(500).json({ error: 'Erreur lors du chargement du profil' });
