@@ -138,7 +138,15 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
         wealthLevel: true,
         charmLevel: true,
         activeCall: true,   
-        isVerified: true,   
+        isVerified: true,
+        
+        // 🔍 C'est ICI qu'on vérifie si le visiteur s'abonne à ce profil
+        followers: {
+          where: { followerId: currentUserId },
+          select: { followerId: true }
+        },
+
+
         photos: {
           select: {
             id: true,
@@ -150,6 +158,7 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
           select: {
             followers: true,
             following: true,
+            receivedGifts: true,
           }
         }
       }
@@ -206,7 +215,17 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
       // (Optionnel) Émission WebSockets si configurée
     }
 
-    res.status(200).json(user);
+    // On vérifie si le tableau followers contient quelqu'un
+    const isFollowing = user.followers && user.followers.length > 0;
+
+    // On retire le tableau brut et on ajoute le booléen
+    const { followers, ...safeUser } = user;
+    const finalUserData = {
+      ...safeUser,
+      isFollowing,
+    };
+
+    res.status(200).json(finalUserData);
   } catch (error) {
     console.error('Erreur getUserProfileById:', error);
     res.status(500).json({ error: 'Erreur lors du chargement du profil' });
