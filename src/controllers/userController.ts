@@ -116,7 +116,7 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
         gender: true,
         interestedIn: true,
         coins: true,
-        tag: true,
+        
         diamonds: true,
         distance: true,
         isOnline: true,
