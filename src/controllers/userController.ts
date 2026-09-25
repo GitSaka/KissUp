@@ -150,6 +150,7 @@ export const getUserProfileById = async (req: AuthenticatedRequest, res: Respons
           select: {
             id: true,
             imageUrl: true,
+            isPrivate: true,
             createdAt: true,
           }
         },
@@ -324,6 +325,9 @@ export const addUserPhoto = async (req: AuthenticatedRequest, res: Response): Pr
 
     // On accepte soit req.body.url, soit req.body.imageUrl pour éviter le plantage 400
     const imageUrl = req.body.url || req.body.imageUrl;
+    
+    // On récupère le statut isPrivate (envoyé en boolean ou string depuis le front, false par défaut)
+    const isPrivate = req.body.isPrivate === true || req.body.isPrivate === 'true';
 
     if (!userId || !imageUrl) {
       res.status(400).json({ error: "Données manquantes (userId ou URL de l'image)." });
@@ -337,8 +341,13 @@ export const addUserPhoto = async (req: AuthenticatedRequest, res: Response): Pr
       return;
     }
 
+    // Création de la photo en base avec son étiquette publique ou privée
     const newPhoto = await prisma.userPhoto.create({
-      data: { userId, imageUrl },
+      data: { 
+        userId, 
+        imageUrl, 
+        isPrivate // 👈 On enregistre true ou false ici
+      },
     });
 
     res.status(201).json({ message: "Photo ajoutée avec succès", photo: newPhoto });

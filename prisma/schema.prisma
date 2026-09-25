@@ -328,6 +328,8 @@ model UserPhoto {
   userId   String
   imageUrl String
 
+  isPrivate Boolean  @default(false)
+
   user     User   @relation("UserGallery", fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
