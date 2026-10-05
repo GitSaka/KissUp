@@ -95,20 +95,62 @@ export const toggleFollow = async (req: AuthenticatedRequest, res: Response): Pr
 };
 
 
-// 2. Récupérer les utilisateurs avec l'état isLiked exact pour l'utilisateur connecté
+// 2. Récupérer les utilisateurs avec l'état isLiked + filtre genre + pagination
 export const getUsersWithLikeStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const currentUserId = req.user?.userId;
-
     if (!currentUserId) {
       res.status(401).json({ error: 'Non authentifié' });
       return;
     }
 
-    // Récupérer tous les utilisateurs sauf soi-même
+    // --- 1. Pagination et catégorie depuis l'URL ---
+    const { page = '1', limit = '20', category } = req.query as { page?: string; limit?: string; category?: string };
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
+    // --- 2. Mapping Recommandés / Nouveaux / En vedette -> Enum Prisma ---
+    const categoryMap: Record<string, any> = {
+      'Recommandés': 'RECOMMENDED',
+      'Nouveaux': 'NEW',
+      'En vedette': 'FEATURED',
+      'RECOMMENDED': 'RECOMMENDED',
+      'NEW': 'NEW',
+      'FEATURED': 'FEATURED',
+    };
+    const tabCategoryFilter = category? categoryMap[category] : undefined;
+
+    // --- 3. Qui est connecté et qui il veut voir ---
+    const currentUser = await prisma.user.findUnique({
+      where: { id: currentUserId },
+      select: { gender: true, interestedIn: true },
+    });
+
+    if (!currentUser) {
+      res.status(404).json({ error: 'Utilisateur introuvable' });
+      return;
+    }
+
+    let targetGender: any = undefined;
+    if (currentUser.interestedIn) {
+      // Si il a choisi "Je cherche", on respecte son choix
+      targetGender = currentUser.interestedIn;
+    } else if (currentUser.gender === 'MALE') {
+      targetGender = 'FEMALE';
+    } else if (currentUser.gender === 'FEMALE') {
+      targetGender = 'MALE';
+    }
+    // Si OTHER et pas de interestedIn -> on ne filtre pas, on montre tout
+
+    // --- 4. Requête optimisée ---
     const users = await prisma.user.findMany({
       where: {
         NOT: { id: currentUserId },
+       ...(targetGender? { gender: targetGender } : {}),
+       ...(tabCategoryFilter? { tabCategory: tabCategoryFilter } : {}),
+        // Optionnel: si tu ne veux pas montrer les bots, décommente :
+        // isBot: false,
       },
       select: {
         id: true,
@@ -118,24 +160,19 @@ export const getUsersWithLikeStatus = async (req: AuthenticatedRequest, res: Res
         activeCall: true,
         distance: true,
         isVerified: true,
-        // On vérifie si l'utilisateur connecté (currentUserId) fait partie de ceux qui suivent ce profil,
-        // OU plus exactement : est-ce que l'utilisateur connecté a créé un follow vers cet utilisateur ?
-        // On interroge la liste des "followers" de cet utilisateur pour voir si "currentUserId" y est.
         followers: {
           where: { followerId: currentUserId },
         },
       },
+      skip,
+      take: limitNum,
+      orderBy: tabCategoryFilter === 'NEW'? { createdAt: 'desc' } : { lastSeen: 'desc' },
     });
 
-    // Transformer les données pour injecter un booléen simple "isLiked"
     const formattedUsers = users.map((user) => {
-      // Si le tableau des followers contient l'ID de l'utilisateur connecté, c'est qu'il l'a liké
       const isLiked = user.followers.length > 0;
-      const { followers, ...rest } = user;
-      return {
-        ...rest,
-        isLiked,
-      };
+      const { followers,...rest } = user;
+      return {...rest, isLiked };
     });
 
     res.status(200).json(formattedUsers);

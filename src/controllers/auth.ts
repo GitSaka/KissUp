@@ -119,7 +119,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const token = jwt.sign(
       { userId: user.id },
       process.env.JWT_SECRET || 'secret',
-      { expiresIn: '7d' }
+      { expiresIn: '365d' }
     );
 
     // 🤖 DÉCLENCHEMENT DE L'HAMEÇON EN ARRIÈRE-PLAN (0ms d'impact sur la réponse HTTP)
@@ -162,7 +162,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     const token = jwt.sign(
       { userId: user.id },
       process.env.JWT_SECRET || 'secret',
-      { expiresIn: '7d' }
+      { expiresIn: '365d' }
     );
 
     // 🤖 DÉCLENCHEMENT ÉGALEMENT À LA CONNEXION : Le serveur vérifie s'il reste du quota pour la journée !
