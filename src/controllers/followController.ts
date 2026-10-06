@@ -156,13 +156,23 @@ export const getUsersWithLikeStatus = async (req: AuthenticatedRequest, res: Res
         id: true,
         nickname: true,
         avatar: true,
+        coins: true,
         isOnline: true,
         activeCall: true,
         distance: true,
         isVerified: true,
+        bio: true,
         followers: {
           where: { followerId: currentUserId },
+          select: { followerId: true }
         },
+         _count: {
+          select: {
+            followers: true,
+            following: true,
+            receivedGifts: true,
+          }
+        }
       },
       skip,
       take: limitNum,
