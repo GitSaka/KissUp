@@ -279,6 +279,7 @@ model Moment {
   content        String?
   type           MomentType  @default(TEXT_ONLY)
   mediaUrls      String[]
+  thumbnailUrl String? // <- AJOUTE ÇA
   duration       String?
   isSponsored    Boolean     @default(false)
   sponsoredUntil DateTime?       

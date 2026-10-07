@@ -6,7 +6,7 @@ import { AuthenticatedRequest } from '../middlewares/authMiddleware.js';
 export const createMoment = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.userId; // Corrigé de authorId à userId
-    const { type, content, mediaUrls, duration, isSponsored } = req.body;
+    const { type, content, mediaUrls, duration,thumbnailUrl, isSponsored } = req.body;
 
     if (!userId) {
       res.status(401).json({ error: 'Non authentifié' });
@@ -21,6 +21,7 @@ export const createMoment = async (req: AuthenticatedRequest, res: Response): Pr
         mediaUrls: mediaUrls || [],
         duration: duration || null,
         isSponsored: isSponsored || false,
+        thumbnailUrl
       },
     });
 
