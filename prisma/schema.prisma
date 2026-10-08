@@ -55,13 +55,33 @@ enum MomentType {
   VIDEO
 }
 
+enum RoomStatus {
+  WAITING
+  ACTIVE
+  FINISHED
+}
+
+enum GameType {
+  NONE
+  QUIZ
+  DOMINO
+  LUDO
+}
+
+enum GameStatus {
+  WAITING
+  PLAYING
+  FINISHED
+}
+
 enum TransactionType {
-  TOPUP          // Achat de coins via FedaPay / CinetPay (Argent réel -> Coins)
-  GIFT_SEND      // Dépense de coins pour envoyer un cadeau
-  GIFT_RECEIVE   // Réception de diamants suite à un cadeau reçu
-  CALL_SPEND     // Dépense pour un appel payant
-  MESSAGE_SPEND  // Dépense pour un message payant
-  WITHDRAWAL     // Retrait de diamants vers de l'argent réel (Mobile Money)
+  TOPUP // Achat de coins via FedaPay / CinetPay (Argent réel -> Coins)
+  GIFT_SEND // Dépense de coins pour envoyer un cadeau
+  GIFT_RECEIVE // Réception de diamants suite à un cadeau reçu
+  CALL_SPEND // Dépense pour un appel payant
+  MESSAGE_SPEND // Dépense pour un message payant
+  WITHDRAWAL // Retrait de diamants vers de l'argent réel (Mobile Money)
+  PHYSICAL_GIFT_ORDER
 }
 
 enum TransactionStatus {
@@ -80,21 +100,21 @@ enum WithdrawalStatus {
 // ==================== MODELS ====================
 
 model User {
-  id               String            @id @default(uuid())
-  phone            String?           @unique
-  email            String?           @unique
-  password         String
-  nickname         String
-  avatar           String?
-  
-  gender           Gender            @default(MALE)
-  interestedIn     Gender?           
-  bio              String?
+  id       String  @id @default(uuid())
+  phone    String? @unique
+  email    String? @unique
+  password String
+  nickname String
+  avatar   String?
+
+  gender       Gender  @default(MALE)
+  interestedIn Gender?
+  bio          String?
 
   // Champs narratifs
-  lifeStory        String?           @db.Text
-  studyPath        String?           @db.Text
-  idealPartner     String?
+  lifeStory    String? @db.Text
+  studyPath    String? @db.Text
+  idealPartner String?
 
   primarySchool    String?
   highSchool       String?
@@ -102,53 +122,53 @@ model User {
   favoriteFood     String?
   passion          String?
   futureMotivation String?
-  
+
   // Infos physiques & géoloc
-  age              Int?
-  height           String?
-  city             String?
-  country          String?
-  continent        String?
-  maritalStatus    String?
-  relationGoal     RelationshipGoal? @default(LONG_TERM)
+  age           Int?
+  height        String?
+  city          String?
+  country       String?
+  continent     String?
+  maritalStatus String?
+  relationGoal  RelationshipGoal? @default(LONG_TERM)
 
   // 💰 Soldes financiers & Niveaux (🚀 Cadeau de 1000 pièces à l'inscription)
-  coins            Int               @default(1000)
-  diamonds         Int               @default(0)
-  wealthLevel      Int               @default(1)
-  charmLevel       Int               @default(1)
-  isVip            Boolean           @default(false)
-  
-  isOnline         Boolean           @default(false)
-  lastSeen         DateTime          @default(now())
+  coins       Int     @default(1000)
+  diamonds    Int     @default(0)
+  wealthLevel Int     @default(1)
+  charmLevel  Int     @default(1)
+  isVip       Boolean @default(false)
 
-  distance         String?           @default("1.0 km")
-  isVerified       Boolean           @default(false)
-  activeCall       CallType?
-  tabCategory      TabCategory       @default(RECOMMENDED)
+  isOnline Boolean  @default(false)
+  lastSeen DateTime @default(now())
+
+  distance    String?     @default("1.0 km")
+  isVerified  Boolean     @default(false)
+  activeCall  CallType?
+  tabCategory TabCategory @default(RECOMMENDED)
 
   // 🚀 Arsenal stratégique & Système
-  isBot            Boolean           @default(false) 
-  botStep          Int               @default(0)     
-  pushToken        String?                     
+  isBot     Boolean @default(false)
+  botStep   Int     @default(0)
+  pushToken String?
 
   // Relations sociales
   sentInteractions     UserInteraction[] @relation("SentInteractions")
   receivedInteractions UserInteraction[] @relation("ReceivedInteractions")
-  
-  sentMessages         Message[]         @relation("SentMessages")
-  receivedMessages     Message[]         @relation("ReceivedMessages")
 
-  moments              Moment[]
-  momentLikes          MomentLike[]
-  momentComments       MomentComment[]
-  photos               UserPhoto[]       @relation("UserGallery")
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
 
-  following            Follow[]          @relation("UserFollowing")
-  followers            Follow[]          @relation("UserFollowers")
-  
-  visitors             ProfileVisitor[]  @relation("VisitorRelation")
-  visiteds             ProfileVisitor[]  @relation("VisitedRelation")
+  moments        Moment[]
+  momentLikes    MomentLike[]
+  momentComments MomentComment[]
+  photos         UserPhoto[]     @relation("UserGallery")
+
+  following Follow[] @relation("UserFollowing")
+  followers Follow[] @relation("UserFollowers")
+
+  visitors ProfileVisitor[] @relation("VisitorRelation")
+  visiteds ProfileVisitor[] @relation("VisitedRelation")
 
   receivedNotifications Notification[] @relation("NotificationReceiver")
   sentNotifications     Notification[] @relation("NotificationSender")
@@ -157,16 +177,25 @@ model User {
   botTriggersReceived BotTrigger[] @relation("BoyTriggers")
   botActionsSent      BotTrigger[] @relation("BotActions")
 
+  // AJOUTE CES 3 LIGNES
+  roomParticipations RoomParticipant[]
+  hostedRooms        KissUpRoom[]        @relation("HostedRooms")
+  giftOrders         PhysicalGiftOrder[]
+
+  coinsEarned   Int @default(0) // Pour acheter les téléphones physiques
+  totalGamesWon Int @default(0)
+
+  gameParticipations GameParticipant[]
 
   // 💰 Relations financières
-  transactions         Transaction[]     @relation("UserTransactions")
-  targetTransactions   Transaction[]     @relation("TargetUserTransactions")
-  sentGifts            GiftTransaction[] @relation("SentGifts")
-  receivedGifts        GiftTransaction[] @relation("ReceivedGifts")
-  withdrawals          WithdrawalRequest[] @relation("UserWithdrawals")
+  transactions       Transaction[]       @relation("UserTransactions")
+  targetTransactions Transaction[]       @relation("TargetUserTransactions")
+  sentGifts          GiftTransaction[]   @relation("SentGifts")
+  receivedGifts      GiftTransaction[]   @relation("ReceivedGifts")
+  withdrawals        WithdrawalRequest[] @relation("UserWithdrawals")
 
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("users")
 }
@@ -174,19 +203,19 @@ model User {
 // ==================== CENTRE DE NOTIFICATIONS ====================
 
 model Notification {
-  id          String           @id @default(uuid())
-  receiverId  String           // Celui qui reçoit la pastille rouge
-  senderId    String?          // L'auteur de l'action (ou null si SYSTEM)
-  type        NotificationType // LIKE, VISIT, SYSTEM
-  title       String           // Le titre de l'alerte
-  content     String           // Le texte de l'alerte
-  actionUrl   String?          // 🚀 L'URL cliquable pour Expo Router (ex: /profile/user_id)
-  isRead      Boolean          @default(false)
-  createdAt   DateTime         @default(now())
+  id         String           @id @default(uuid())
+  receiverId String // Celui qui reçoit la pastille rouge
+  senderId   String? // L'auteur de l'action (ou null si SYSTEM)
+  type       NotificationType // LIKE, VISIT, SYSTEM
+  title      String // Le titre de l'alerte
+  content    String // Le texte de l'alerte
+  actionUrl  String? // 🚀 L'URL cliquable pour Expo Router (ex: /profile/user_id)
+  isRead     Boolean          @default(false)
+  createdAt  DateTime         @default(now())
 
   // 🔗 Relations Prisma pour inclure les infos utilisateur
-  receiver    User             @relation("NotificationReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
-  sender      User?            @relation("NotificationSender", fields: [senderId], references: [id], onDelete: SetNull)
+  receiver User  @relation("NotificationReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender   User? @relation("NotificationSender", fields: [senderId], references: [id], onDelete: SetNull)
 
   @@map("notifications")
 }
@@ -194,41 +223,41 @@ model Notification {
 // ==================== SECTIONS SOCIALES ====================
 
 model ProfileVisitor {
-  id         String   @id @default(uuid())
-  visitorId  String   
-  visitedId  String   
-  visitedAt  DateTime @default(now()) 
+  id        String   @id @default(uuid())
+  visitorId String
+  visitedId String
+  visitedAt DateTime @default(now())
 
-  visitor    User     @relation("VisitorRelation", fields: [visitorId], references: [id], onDelete: Cascade)
-  visited    User     @relation("VisitedRelation", fields: [visitedId], references: [id], onDelete: Cascade)
+  visitor User @relation("VisitorRelation", fields: [visitorId], references: [id], onDelete: Cascade)
+  visited User @relation("VisitedRelation", fields: [visitedId], references: [id], onDelete: Cascade)
 
   @@map("profile_visitors")
 }
 
 model Follow {
-  id          String   @id @default(uuid())
+  id          String @id @default(uuid())
   followerId  String
   followingId String
-  
-  follower    User     @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
-  following   User     @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
 
-  createdAt   DateTime @default(now())
+  follower  User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 
   @@unique([followerId, followingId])
   @@map("follows")
 }
 
 model UserInteraction {
-  id         String   @id @default(uuid())
+  id         String @id @default(uuid())
   senderId   String
   receiverId String
-  status     String   @default("liked")
-  
-  sender     User     @relation("SentInteractions", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver   User     @relation("ReceivedInteractions", fields: [receiverId], references: [id], onDelete: Cascade)
+  status     String @default("liked")
 
-  createdAt  DateTime @default(now())
+  sender   User @relation("SentInteractions", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedInteractions", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 
   @@unique([senderId, receiverId])
   @@map("user_interactions")
@@ -239,59 +268,57 @@ model UserInteraction {
 // ==================== COMPTEUR STRATÉGIQUE ANTI-SPAM ====================
 
 model BotTrigger {
-  id         String   @id @default(uuid())
-  userId     String   // L'ID du vrai garçon qui reçoit l'hameçon
-  botId      String   // L'ID du robot femme qui a pris l'initiative d'écrire
-  createdAt  DateTime @default(now())
+  id        String   @id @default(uuid())
+  userId    String // L'ID du vrai garçon qui reçoit l'hameçon
+  botId     String // L'ID du robot femme qui a pris l'initiative d'écrire
+  createdAt DateTime @default(now())
 
   // 🔗 Relations explicites vers la table "users"
-  user       User     @relation("BoyTriggers", fields: [userId], references: [id], onDelete: Cascade)
-  bot        User     @relation("BotActions", fields: [botId], references: [id], onDelete: Cascade)
+  user User @relation("BoyTriggers", fields: [userId], references: [id], onDelete: Cascade)
+  bot  User @relation("BotActions", fields: [botId], references: [id], onDelete: Cascade)
 
   @@map("bot_triggers")
 }
 
-
-
 model Message {
-  id              String      @id @default(uuid())
-  senderId        String
-  receiverId      String
+  id         String @id @default(uuid())
+  senderId   String
+  receiverId String
 
   type            MessageType @default(TEXT)
   content         String?
   mediaUrl        String?
   durationSeconds Int?
 
-  isRead          Boolean     @default(false)
+  isRead Boolean @default(false)
 
-  sender          User        @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver        User        @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender   User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
 
-  createdAt       DateTime    @default(now())
+  createdAt DateTime @default(now())
 
   @@map("messages")
 }
 
 model Moment {
-  id             String      @id @default(uuid())
+  id             String     @id @default(uuid())
   userId         String
   content        String?
-  type           MomentType  @default(TEXT_ONLY)
+  type           MomentType @default(TEXT_ONLY)
   mediaUrls      String[]
-  thumbnailUrl String? // <- AJOUTE ÇA
+  thumbnailUrl   String? // <- AJOUTE ÇA
   duration       String?
-  isSponsored    Boolean     @default(false)
-  sponsoredUntil DateTime?       
-  isVipPost      Boolean     @default(false)
-  
-  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  likes          MomentLike[]
-  comments       MomentComment[]
+  isSponsored    Boolean    @default(false)
+  sponsoredUntil DateTime?
+  isVipPost      Boolean    @default(false)
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes            MomentLike[]
+  comments         MomentComment[]
   giftTransactions GiftTransaction[]
 
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("moments")
 }
@@ -301,8 +328,8 @@ model MomentLike {
   momentId String
   userId   String
 
-  moment   Moment @relation(fields: [momentId], references: [id], onDelete: Cascade)
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moment Moment @relation(fields: [momentId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
@@ -311,13 +338,13 @@ model MomentLike {
 }
 
 model MomentComment {
-  id       String   @id @default(uuid())
+  id       String @id @default(uuid())
   momentId String
   userId   String
   text     String
 
-  moment   Moment   @relation(fields: [momentId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moment Moment @relation(fields: [momentId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
@@ -329,9 +356,9 @@ model UserPhoto {
   userId   String
   imageUrl String
 
-  isPrivate Boolean  @default(false)
+  isPrivate Boolean @default(false)
 
-  user     User   @relation("UserGallery", fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation("UserGallery", fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
@@ -341,60 +368,60 @@ model UserPhoto {
 // ==================== 💰 MODULE FINANCIER COMPLET ====================
 
 model Gift {
-  id           String            @id @default(uuid())
-  name         String            
-  priceInCoins Int               
-  iconUrl      String            
-  category     String?           @default("standard")
-  isActive     Boolean           @default(true)
+  id           String  @id @default(uuid())
+  name         String
+  priceInCoins Int
+  iconUrl      String
+  category     String? @default("standard")
+  isActive     Boolean @default(true)
 
   transactions GiftTransaction[]
 
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("gifts")
 }
 
 model Transaction {
   id               String            @id @default(uuid())
-  userId           String            
-  targetUserId     String?           
-  type             TransactionType   
-  amountCoins      Int?              
-  amountDiamonds   Int?              
-  fiatAmount       Float?            
+  userId           String
+  targetUserId     String?
+  type             TransactionType
+  amountCoins      Int?
+  amountDiamonds   Int?
+  fiatAmount       Float?
   fiatCurrency     String?           @default("XOF")
-  gateway          String?           
-  gatewayReference String?           @unique 
+  gateway          String?
+  gatewayReference String?           @unique
   status           TransactionStatus @default(PENDING)
   description      String?
 
-  user             User              @relation("UserTransactions", fields: [userId], references: [id], onDelete: Cascade)
-  targetUser       User?             @relation("TargetUserTransactions", fields: [targetUserId], references: [id], onDelete: SetNull)
+  user       User  @relation("UserTransactions", fields: [userId], references: [id], onDelete: Cascade)
+  targetUser User? @relation("TargetUserTransactions", fields: [targetUserId], references: [id], onDelete: SetNull)
 
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("transactions")
 }
 
 model GiftTransaction {
-  id            String   @id @default(uuid())
+  id            String  @id @default(uuid())
   senderId      String
   receiverId    String
   giftId        String
   momentId      String?
-  quantity      Int      @default(1)
-  totalCoins    Int      
-  totalDiamonds Int      
+  quantity      Int     @default(1)
+  totalCoins    Int
+  totalDiamonds Int
 
-  sender        User     @relation("SentGifts", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver      User     @relation("ReceivedGifts", fields: [receiverId], references: [id], onDelete: Cascade)
-  gift          Gift     @relation(fields: [giftId], references: [id], onDelete: Cascade)
-  moment        Moment?  @relation(fields: [momentId], references: [id], onDelete: SetNull) 
+  sender   User    @relation("SentGifts", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User    @relation("ReceivedGifts", fields: [receiverId], references: [id], onDelete: Cascade)
+  gift     Gift    @relation(fields: [giftId], references: [id], onDelete: Cascade)
+  moment   Moment? @relation(fields: [momentId], references: [id], onDelete: SetNull)
 
-  createdAt     DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@map("gift_transactions")
 }
@@ -402,17 +429,111 @@ model GiftTransaction {
 model WithdrawalRequest {
   id             String           @id @default(uuid())
   userId         String
-  diamondsAmount Int              
-  fiatAmount     Float            
-  phoneNumber    String           
-  provider       String           
+  diamondsAmount Int
+  fiatAmount     Float
+  phoneNumber    String
+  provider       String
   status         WithdrawalStatus @default(PENDING)
   adminNote      String?
 
-  user           User             @relation("UserWithdrawals", fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation("UserWithdrawals", fields: [userId], references: [id], onDelete: Cascade)
 
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("withdrawal_requests")
+}
+
+// Salon KissUp = 1 appel vidéo + 1 jeu optionnel
+model KissUpRoom {
+  id              String     @id @default(uuid())
+  livekitName     String     @unique // Le nom de la room chez LiveKit : kissup_abc123
+  hostId          String
+  gameType        GameType   @default(NONE)
+  betAmount       Int        @default(0) // Mise en coins
+  maxParticipants Int        @default(4)
+  status          RoomStatus @default(WAITING)
+
+  // Relation inverse vers User
+  host User @relation("HostedRooms", fields: [hostId], references: [id], onDelete: Cascade)
+
+  participants RoomParticipant[]
+  gameSession  GameSession?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("kissup_rooms")
+}
+
+model RoomParticipant {
+  id       String   @id @default(uuid())
+  roomId   String
+  userId   String
+  joinedAt DateTime @default(now())
+
+  room KissUpRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@map("room_participants")
+}
+
+// Une partie de jeu dans la room
+model GameSession {
+  id        String     @id @default(uuid())
+  roomId    String     @unique
+  gameType  GameType
+  status    GameStatus @default(WAITING)
+  potAmount Int        @default(0) // Total des mises
+  winnerId  String?
+
+  room         KissUpRoom        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  participants GameParticipant[]
+
+  createdAt DateTime @default(now())
+
+  @@map("game_sessions")
+}
+
+model GameParticipant {
+  id            String  @id @default(uuid())
+  gameSessionId String
+  userId        String
+  hasWon        Boolean @default(false)
+  coinsWon      Int     @default(0)
+
+  gameSession GameSession @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("game_participants")
+}
+
+model PhysicalGift {
+  id         String  @id @default(uuid())
+  name       String // "Tecno Spark 20"
+  coinsPrice Int // 150000 coins EARNED seulement
+  realPrice  Int // 60000 XOF pour toi
+  stock      Int     @default(10)
+  imageUrl   String?
+
+  orders PhysicalGiftOrder[]
+
+  @@map("physical_gifts")
+}
+
+model PhysicalGiftOrder {
+  id              String  @id @default(uuid())
+  userId          String
+  giftId          String
+  status          String  @default("PENDING") // PENDING, SHIPPED, DELIVERED
+  deliveryAddress String?
+  phoneNumber     String
+
+  user User         @relation(fields: [userId], references: [id])
+  gift PhysicalGift @relation(fields: [giftId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("physical_gift_orders")
 }

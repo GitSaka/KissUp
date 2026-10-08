@@ -14,6 +14,7 @@ import { prisma } from './config/prisma.js';
 import { createServer } from 'http';
 import { initSocketServer } from './socket.js';
 import { initBotRelanceCron } from './cron/botRelanceCron.js';
+import livekitRoutes from './modules/livekit/livekit.route.js';
 
 
 dotenv.config();
@@ -34,6 +35,7 @@ app.use('/api/follow', followRoutes); // 👈 nouveau
 app.use('/api/moments', momentRoutes); // 👈 nouveau
 app.use('/api/gifts', giftRoutes); // 👈 nouveau
 app.use('/api/notification', giftNotifications); // 👈 nouveau
+app.use('/api/livekit', livekitRoutes);
 
 
 
