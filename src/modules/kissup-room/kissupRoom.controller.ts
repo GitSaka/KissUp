@@ -5,7 +5,7 @@ export class KissUpRoomController {
   // POST /api/kissup-rooms
   static async create(req: Request, res: Response) {
     try {
-      const hostId = (req as any).user.id;
+      const hostId = (req as any).user.userId;
       if (!hostId) {
         return res.status(401).json({ message: 'Non authentifié' });
       }
