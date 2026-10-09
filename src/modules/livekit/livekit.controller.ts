@@ -5,7 +5,7 @@ import { tokenService } from './token.service.js';
 export class LivekitController {
   static async getToken(req: Request, res: Response) {
     try {
-      const userId = (req as any).user.id;
+      const userId = (req as any).user.userId;
       const { roomId } = req.body;
 
       if (!roomId) {

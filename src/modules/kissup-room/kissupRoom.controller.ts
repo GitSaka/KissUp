@@ -87,7 +87,7 @@ export class KissUpRoomController {
   // GET /api/kissup-rooms/my/open
   static async myOpen(req: Request, res: Response) {
     try {
-      const hostId = (req as any).user.id;
+      const hostId = (req as any).user.userId;
       const room = await prisma.kissUpRoom.findFirst({
         where: { hostId, status: { in: ['WAITING', 'ACTIVE'] } },
         include: {
@@ -108,7 +108,7 @@ export class KissUpRoomController {
   // POST /api/kissup-rooms/:id/leave
   static async leave(req: Request, res: Response) {
     try {
-      const userId = (req as any).user.id;
+      const userId = (req as any).user.userId;
       const roomId = req.params.id as string;
 
       if (!roomId) {
