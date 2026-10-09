@@ -1,6 +1,3 @@
-// À remplacer dans src/modules/livekit/livekit.controller.ts
-// Ajoute check FULL + passage ACTIVE
-
 import { Request, Response } from 'express';
 import { prisma } from '../../config/prisma.js';
 import { tokenService } from './token.service.js';
@@ -9,7 +6,7 @@ export class LivekitController {
   static async getToken(req: Request, res: Response) {
     try {
       const userId = (req as any).user.id;
-      const { roomId } = req.body; // roomId = id DB (uuid), pas livekitName
+      const { roomId } = req.body;
 
       if (!roomId) {
         return res.status(400).json({ message: 'roomId manquant' });
@@ -28,7 +25,7 @@ export class LivekitController {
         return res.status(403).json({ message: 'Salon fermé' });
       }
 
-      // Check FULL avant upsert
+      // Check FULL - 4 max, mais si déjà dedans on le laisse re-rentrer
       const isAlreadyIn = room.participants.some(p => p.userId === userId);
       if (!isAlreadyIn && room.participants.length >= room.maxParticipants) {
         return res.status(403).json({ message: 'Room pleine (4 max)' });
@@ -36,14 +33,12 @@ export class LivekitController {
 
       // Upsert participant
       await prisma.roomParticipant.upsert({
-        where: {
-          roomId_userId: { roomId: room.id, userId },
-        },
+        where: { roomId_userId: { roomId: room.id, userId } },
         create: { roomId: room.id, userId },
         update: {},
       });
 
-      // Passe en ACTIVE dès qu'il y a 1 participant
+      // WAITING -> ACTIVE dès 1 participant
       if (room.status === 'WAITING') {
         await prisma.kissUpRoom.update({
           where: { id: room.id },
@@ -53,21 +48,25 @@ export class LivekitController {
 
       const user = await prisma.user.findUnique({ where: { id: userId } });
 
+      // Génère token avec livekitName (pas id DB)
       const result = await tokenService.generate(
-        room.livekitName, // on envoie livekitName à LiveKit, pas l'id DB
+        room.livekitName,
         userId,
         user?.nickname || 'Player'
       );
 
-      // On renvoie aussi livekitName et url pour CallManager
       return res.json({
-        ...result,
+        token: (result as any).token || result,
         livekitName: room.livekitName,
         roomId: room.id,
       });
-    } catch (error) {
-      console.error('[LiveKit getToken]', error);
-      return res.status(500).json({ message: 'Erreur token LiveKit' });
+    } catch (error: any) {
+      console.error('[LiveKit getToken] FULL ERROR:', error);
+      return res.status(500).json({ 
+        message: 'Erreur token LiveKit', 
+        error: error.message,
+        details: String(error)
+      });
     }
   }
 }

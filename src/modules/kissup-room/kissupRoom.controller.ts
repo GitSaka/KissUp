@@ -6,24 +6,31 @@ export class KissUpRoomController {
   static async create(req: Request, res: Response) {
     try {
       const hostId = (req as any).user.id;
+      if (!hostId) {
+        return res.status(401).json({ message: 'Non authentifié' });
+      }
 
-      // 1. Anti 10 salons : si j'ai déjà WAITING ou ACTIVE, je le réutilise
+      // Anti 10 salons : réutilise seulement si vraiment WAITING/ACTIVE et pas vieux test
       const existing = await prisma.kissUpRoom.findFirst({
         where: {
           hostId,
           status: { in: ['WAITING', 'ACTIVE'] },
+          NOT: { livekitName: { startsWith: 'kissup_test_' } },
         },
         include: {
           host: { select: { id: true, nickname: true, avatar: true } },
-          participants: true,
+          participants: {
+            include: { user: { select: { id: true, nickname: true, avatar: true } } },
+          },
         },
+        orderBy: { createdAt: 'desc' },
       });
 
       if (existing) {
         return res.json(existing);
       }
 
-      // 2. Génère livekitName unique côté backend (pas mobile)
+      // Génère livekitName unique côté backend
       const livekitName = `kissup_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
       const room = await prisma.kissUpRoom.create({
@@ -32,19 +39,23 @@ export class KissUpRoomController {
           hostId,
           maxParticipants: 4,
           status: 'WAITING',
-          gameType: 'NONE',
-          betAmount: 0,
         },
         include: {
           host: { select: { id: true, nickname: true, avatar: true } },
-          participants: true,
+          participants: {
+            include: { user: { select: { id: true, nickname: true, avatar: true } } },
+          },
         },
       });
 
       return res.status(201).json(room);
-    } catch (e) {
-      console.error('[KissUpRoom create]', e);
-      return res.status(500).json({ message: 'Erreur création salon' });
+    } catch (e: any) {
+      console.error('[KissUpRoom create] ERREUR:', e);
+      return res.status(500).json({
+        message: 'Erreur création salon',
+        error: e.message,
+        details: String(e)
+      });
     }
   }
 
@@ -65,13 +76,11 @@ export class KissUpRoomController {
         orderBy: { createdAt: 'desc' },
       });
 
-      // Filtre les pleins (4/4) côté JS - simple et sûr
       const openRooms = rooms.filter(r => r.participants.length < r.maxParticipants);
-
       return res.json(openRooms);
-    } catch (e) {
+    } catch (e: any) {
       console.error('[KissUpRoom listOpen]', e);
-      return res.status(500).json({ message: 'Erreur liste salons' });
+      return res.status(500).json({ message: 'Erreur liste salons', error: e.message });
     }
   }
 
@@ -79,20 +88,20 @@ export class KissUpRoomController {
   static async myOpen(req: Request, res: Response) {
     try {
       const hostId = (req as any).user.id;
-
       const room = await prisma.kissUpRoom.findFirst({
         where: { hostId, status: { in: ['WAITING', 'ACTIVE'] } },
         include: {
           host: { select: { id: true, nickname: true, avatar: true } },
-          participants: true,
+          participants: {
+            include: { user: { select: { id: true, nickname: true, avatar: true } } },
+          },
         },
         orderBy: { createdAt: 'desc' },
       });
-
       return res.json(room || null);
-    } catch (e) {
+    } catch (e: any) {
       console.error('[KissUpRoom myOpen]', e);
-      return res.status(500).json({ message: 'Erreur check salon' });
+      return res.status(500).json({ message: 'Erreur check salon', error: e.message });
     }
   }
 
@@ -102,7 +111,10 @@ export class KissUpRoomController {
       const userId = (req as any).user.id;
       const roomId = req.params.id as string;
 
-      // Supprime ma ligne participant
+      if (!roomId) {
+        return res.status(400).json({ message: 'roomId manquant' });
+      }
+
       await prisma.roomParticipant.deleteMany({
         where: { roomId, userId },
       });
@@ -113,13 +125,11 @@ export class KissUpRoomController {
       });
 
       if (remaining.length === 0) {
-        // Plus personne -> FINISHED
         await prisma.kissUpRoom.update({
           where: { id: roomId },
           data: { status: 'FINISHED' },
         });
       } else {
-        // Si c'était le host qui part, transfère au plus ancien
         const room = await prisma.kissUpRoom.findUnique({ where: { id: roomId } });
         if (room && room.hostId === userId) {
           await prisma.kissUpRoom.update({
@@ -130,9 +140,9 @@ export class KissUpRoomController {
       }
 
       return res.json({ success: true });
-    } catch (e) {
+    } catch (e: any) {
       console.error('[KissUpRoom leave]', e);
-      return res.status(500).json({ message: 'Erreur leave' });
+      return res.status(500).json({ message: 'Erreur leave', error: e.message });
     }
   }
 }
