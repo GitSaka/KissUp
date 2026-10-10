@@ -63,7 +63,13 @@ export class LivekitController {
       // 3. Current user
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, nickname: true },
+        select: { 
+            id: true, 
+            nickname: true, 
+            avatar: true, 
+            coins: true, 
+            diamonds: true 
+          },
       });
 
       // 4. Token LiveKit
@@ -79,12 +85,21 @@ export class LivekitController {
         livekitName: room.livekitName,
         roomId: room.id,
         host: host, // { nickname, avatar, coins, diamonds } -> pour TopBar
+        me: {
+            id: user!.id,
+            nickname: user!.nickname,
+            avatar: user!.avatar,
+            coins: user!.coins,
+            diamonds: user!.diamonds,
+          },
         room: {
           id: room.id,
           status: room.status,
           betAmount: room.betAmount,
           maxParticipants: room.maxParticipants,
         },
+
+
       });
     } catch (error: any) {
       console.error('[LiveKit getToken] FULL ERROR:', error);
