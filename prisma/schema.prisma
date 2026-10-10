@@ -41,6 +41,21 @@ enum TabCategory {
   FEATURED
 }
 
+enum TransactionType {
+  TOPUP
+  BONUS // les 1000 de départ
+  GIFT_SEND
+  GIFT_RECEIVE
+  CALL_SPEND
+  MESSAGE_SPEND
+  GAME_BET // quand tu mises 2500 coins
+  GAME_WIN // quand tu gagnes 10000
+  GAME_REFUND // partie annulée, on te rend
+  GAME_FEE // 20% que la plateforme prend
+  WITHDRAWAL
+  PHYSICAL_GIFT_ORDER
+}
+
 enum MessageType {
   TEXT
   IMAGE
@@ -400,6 +415,13 @@ model Transaction {
   user       User  @relation("UserTransactions", fields: [userId], references: [id], onDelete: Cascade)
   targetUser User? @relation("TargetUserTransactions", fields: [targetUserId], references: [id], onDelete: SetNull)
 
+  gameSessionId String? // lié à quel jeu?
+  roomId String? // dans quel salon?
+  gameSession GameSession? @relation(fields: [gameSessionId], references: [id])
+
+  // Pour FedaPay
+  coinsPackageId String? // quel pack acheté
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -421,9 +443,22 @@ model GiftTransaction {
   gift     Gift    @relation(fields: [giftId], references: [id], onDelete: Cascade)
   moment   Moment? @relation(fields: [momentId], references: [id], onDelete: SetNull)
 
+  roomId String? // si cadeau fait dans salon
+  platformFee Int @default(30) // 30% pour toi, 70% pour host
+  isInRoom Boolean @default(false)
+
   createdAt DateTime @default(now())
 
   @@map("gift_transactions")
+}
+
+model CoinsPackage {
+  id String @id @default(uuid())
+  name String // "5000 coins"
+  coinsAmount Int // 5000
+  priceXOF Int // 5000 XOF
+  bonusCoins Int @default(0) // 500 bonus
+  isActive Boolean @default(true)
 }
 
 model WithdrawalRequest {
@@ -481,32 +516,36 @@ model RoomParticipant {
 
 // Une partie de jeu dans la room
 model GameSession {
-  id        String     @id @default(uuid())
-  roomId    String     @unique
-  gameType  GameType
-  status    GameStatus @default(WAITING)
-  potAmount Int        @default(0) // Total des mises
-  winnerId  String?
+  id String @id @default(uuid())
+  roomId String @unique
+  gameType GameType
+  status GameStatus @default(WAITING)
+  potAmount Int @default(0)
+  commission Int @default(20) // 20% pour toi
+  winnerId String?
+  totalBets Int @default(0) // somme de toutes les mises
+  netPot Int @default(0) // pot - commission = ce que le gagnant prend
 
-  room         KissUpRoom        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  room KissUpRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
   participants GameParticipant[]
+  transactions Transaction[]
 
   createdAt DateTime @default(now())
-
-  @@map("game_sessions")
+  endedAt DateTime?
 }
 
 model GameParticipant {
-  id            String  @id @default(uuid())
+  id String @id @default(uuid())
   gameSessionId String
-  userId        String
-  hasWon        Boolean @default(false)
-  coinsWon      Int     @default(0)
+  userId String
+  betAmount Int @default(0) // combien il a misé
+  hasWon Boolean @default(false)
+  coinsWon Int @default(0) // ce qu'il a gagné (netPot)
+  coinsEarnedWon Int @default(0) // partie qui va en coinsEarned pour téléphone
+  position Int? // 1er, 2eme, 3eme
 
   gameSession GameSession @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("game_participants")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model PhysicalGift {
