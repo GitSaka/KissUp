@@ -89,15 +89,6 @@ enum GameStatus {
   FINISHED
 }
 
-enum TransactionType {
-  TOPUP // Achat de coins via FedaPay / CinetPay (Argent réel -> Coins)
-  GIFT_SEND // Dépense de coins pour envoyer un cadeau
-  GIFT_RECEIVE // Réception de diamants suite à un cadeau reçu
-  CALL_SPEND // Dépense pour un appel payant
-  MESSAGE_SPEND // Dépense pour un message payant
-  WITHDRAWAL // Retrait de diamants vers de l'argent réel (Mobile Money)
-  PHYSICAL_GIFT_ORDER
-}
 
 enum TransactionStatus {
   PENDING
